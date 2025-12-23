@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ssafy.tigetting.mapper.PerformanceMapper">
+
+    <insert id="save" useGeneratedKeys="true" keyProperty="performanceId">
+        INSERT INTO performances (venue_id, title, description, theme, poster_url, start_date, end_date, running_time, base_price, status, created_at, updated_at)
+        VALUES (#{venue.venueId}, #{title}, #{description}, #{theme}, #{posterUrl}, #{startDate}, #{endDate}, #{runningTime}, #{basePrice}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update">
+        UPDATE performances
+        SET venue_id = #{venue.venueId},
+            title = #{title},
+            description = #{description},
+            theme = #{theme},
+            poster_url = #{posterUrl},
+            start_date = #{startDate},
+            end_date = #{endDate},
+            running_time = #{runningTime},
+            base_price = #{basePrice},
+            status = #{status},
+            updated_at = #{updatedAt}
+        WHERE performance_id = #{performanceId}
+    </update>
+
+    <select id="findAll" resultType="com.ssafy.tigetting.performance.dto.PerformanceDto">
+        SELECT 
+            p.mt20id,
+            p.prfnm,
+            p.prfpdfrom,
+            p.prfpdto,
+            p.fcltynm,
+            p.poster,
+            p.area,
+            g.genrenm as genreName,
+            p.prfstate,
+            p.mt10id
+        FROM performances p
+        LEFT JOIN genres g ON p.genreid = g.genreid
+    </select>
+
+    <select id="findById" resultType="com.ssafy.tigetting.performance.dto.PerformanceDto">
+        SELECT 
+            p.mt20id,
+            p.prfnm,
+            p.prfpdfrom,
+            p.prfpdto,
+            p.fcltynm,
+            p.poster,
+            p.area,
+            g.genrenm as genreName,
+            p.prfstate,
+            p.mt10id
+        FROM performances p
+        LEFT JOIN genres g ON p.genreid = g.genreid
+        WHERE p.mt20id = #{id}
+    </select>
+
+    <resultMap id="PerformanceDetailResultMap" type="com.ssafy.tigetting.performance.dto.PerformanceDetailDto">
+        <result property="mt20id" column="mt20id"/>
+        <result property="prfnm" column="prfnm"/>
+        <result property="prfpdfrom" column="prfpdfrom"/>
+        <result property="prfpdto" column="prfpdto"/>
+        <result property="fcltynm" column="fcltynm"/>
+        <result property="poster" column="poster"/>
+        <result property="area" column="area"/>
+        <result property="genreName" column="genreName"/>
+        <result property="prfstate" column="prfstate"/>
+        <result property="mt10id" column="mt10id"/>
+        <result property="prfcast" column="prfcast"/>
+        <result property="prfcrew" column="prfcrew"/>
+        <result property="prfruntime" column="prfruntime"/>
+        <result property="prfage" column="prfage"/>
+        <result property="pcseguidance" column="pcseguidance"/>
+        <result property="sty" column="sty"/>
+        <result property="updatedate" column="updatedate"/>
+        <result property="dtguidance" column="dtguidance"/>
+        <collection property="styurls" ofType="String">
+            <result column="styurl"/>
+        </collection>
+    </resultMap>
+
+    <select id="findDetailById" resultMap="PerformanceDetailResultMap">
+        SELECT 
+            p.mt20id,
+            p.prfnm,
+            p.prfpdfrom,
+            p.prfpdto,
+            p.fcltynm,
+            p.poster,
+            p.area,
+            g.genrenm as genreName,
+            p.prfstate,
+            p.mt10id,
+            pd.prfcast,
+            pd.prfcrew,
+            pd.prfruntime,
+            pd.prfage,
+            pd.pcseguidance,
+            pd.sty,
+            pd.updatedate,
+            pd.dtguidance,
+            ps.styurl
+        FROM performances p
+        LEFT JOIN genres g ON p.genreid = g.genreid
+        LEFT JOIN performance_details pd ON p.mt20id = pd.mt20id
+        LEFT JOIN performance_styurls ps ON p.mt20id = ps.mt20id
+        WHERE p.mt20id = #{id}
+    </select>
+
+    <select id="findByVenueId" resultMap="PerformanceResultMap">
+        SELECT * FROM performances WHERE venue_id = #{venueId}
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM performances WHERE performance_id = #{id}
+    </delete>
+
+    <resultMap id="PerformanceResultMap" type="Performance">
+        <id property="performanceId" column="performance_id"/>
+        <result property="title" column="title"/>
+        <result property="description" column="description"/>
+        <result property="theme" column="theme"/>
+        <result property="posterUrl" column="poster_url"/>
+        <result property="startDate" column="start_date"/>
+        <result property="endDate" column="end_date"/>
+        <result property="runningTime" column="running_time"/>
+        <result property="basePrice" column="base_price"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <association property="venue" column="venue_id" select="com.ssafy.tigetting.venue.mapper.VenueMapper.findById"/>
+    </resultMap>
+
+</mapper>
