@@ -32,6 +32,7 @@ const props = defineProps<Props>();
 const isMapModalOpen = ref(false);
 const tickets = ref<TicketData[]>([]);
 const isLoading = ref(true);
+const lastSelectedRegion = ref<string>("서울"); // 마지막으로 선택한 지역 저장
 
 onMounted(async () => {
   try {
@@ -141,6 +142,16 @@ const genreId = computed(() => {
 
   return genreMap[props.selectedCategory] || null;
 });
+
+// 활성화된 지역 (이전에 선택한 지역 또는 기본값 서울)
+const activeRegion = computed(() => {
+  return lastSelectedRegion.value || "서울";
+});
+
+// 지역 선택 업데이트 함수
+const updateLastSelectedRegion = (region: string) => {
+  lastSelectedRegion.value = region;
+};
 </script>
 
 <template>
@@ -187,7 +198,13 @@ const genreId = computed(() => {
     </Transition>
 
     <!-- Map Modal -->
-    <MapModal :isOpen="isMapModalOpen" :genreId="genreId" @close="isMapModalOpen = false" />
+    <MapModal
+      :isOpen="isMapModalOpen"
+      :genreId="genreId"
+      :initialRegion="activeRegion"
+      @close="isMapModalOpen = false"
+      @regionChange="updateLastSelectedRegion"
+    />
   </main>
 </template>
 

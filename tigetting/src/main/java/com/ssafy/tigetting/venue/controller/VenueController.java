@@ -33,7 +33,7 @@ public class VenueController {
             @RequestParam(required = false) Integer genreId) {
         System.out.println("🔍 권역별 공연장 조회 요청 - region 권역: " + region);
         List<VenueDto> venues = venueService.getVenuesByRegion(region, genreId);
-        System.out.println("venues performanceCount : " + venues.get(0).toString());
+        //System.out.println("venues performanceCount : " + venues.get(0).toString());
         System.out.println("✅ 조회된 공연장 수: " + venues.size());
         return ResponseEntity.ok(venues);
     }

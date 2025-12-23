@@ -47,4 +47,17 @@ export const ticketService = {
     const response = await api.get(`/api/venues/region`, { params });
     return response.data;
   },
+
+  // 공연장 상세 정보 조회
+  async getVenueDetail(venueId, genreId, region) {
+    // 쿼리 파라미터 객체
+    const params = {
+      genreId: genreId,
+      region: region,
+    };
+
+    // API 요청: /api/venues/detail/{venueId}
+    const response = await api.get(`/api/venues/detail/${venueId}`, { params });
+    return response.data;
+  },
 };
