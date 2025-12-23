@@ -6,8 +6,8 @@ spring:
     name: tigetting
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/tget?serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true
-    username: ssafy
-    password: ssafy
+    username: tiget
+    password: tiget
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 mybatis:

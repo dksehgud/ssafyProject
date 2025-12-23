@@ -46,6 +46,7 @@ CREATE TABLE prices (
 );
 
 -- 5. 공연별 좌석 정보 테이블 (Depends on prices)
+-- 공연별 좌석 정보 테이블
 CREATE TABLE seats (
 	mt20id VARCHAR(255) PRIMARY KEY COMMENT '공연 ID(FK)',
 	seatid INT NOT NULL COMMENT '좌석 번호',
@@ -101,9 +102,6 @@ CREATE TABLE performances (
     CONSTRAINT fk_performance_venue FOREIGN KEY (mt10id) REFERENCES venues(mt10id),
     CONSTRAINT fk_performance_user FOREIGN KEY (userid) REFERENCES users(userid)
 );
-
-ALTER TABLE performances 
-ADD COLUMN user_id INT NULL; 
 
 -- 공연 상세 정보 테이블 (1:1 관계)
 CREATE TABLE performance_details (
