@@ -39,14 +39,17 @@ const markers = ref<any[]>([]);
 const kakaoReady = ref(false);
 let scriptLoading = false;
 
-const regions = ["서울", "경기/인천", "충청/강원", "대구/경북", "부산/경남", "광주/전라", "기타"];
+const regions = ["서울", "경기/인천", "충청/강원", "대구/경북", "부산/경남", "광주/전라"];
 
 interface VenueInfo {
   name: string;
   area: string;
   region: string;
+  performanceCount: number;
   performances: TicketData[];
   address: string;
+  sidonm: string;
+  gugunnm: string;
   latitude?: number;
   longitude?: number;
 }
@@ -67,23 +70,53 @@ const loadRegionVenues = async (region: string) => {
     console.log("[MapModal] 지역 데이터 로드:", region, "genreId:", props.genreId);
     const data = await ticketService.getVenuesByRegion(region, props.genreId);
 
+    console.log("[MapModal] ===== 백엔드 응답 데이터 =====");
+    console.log("[MapModal] 전체 데이터 개수:", data.length);
+    if (data.length > 0) {
+      console.log("[MapModal] 첫 번째 항목 전체:", data[0]);
+      console.log("[MapModal] fcltynm:", data[0].fcltynm);
+      console.log("[MapModal] sidonm:", data[0].sidonm);
+      console.log("[MapModal] gugunnm:", data[0].gugunnm);
+      console.log("[MapModal] la (위도):", data[0].la, "타입:", typeof data[0].la);
+      console.log("[MapModal] lo (경도):", data[0].lo, "타입:", typeof data[0].lo);
+      console.log("[MapModal] adres:", data[0].adres);
+      console.log("[MapModal] performanceCount:", data[0].performanceCount);
+    }
+
     // 서버에서 받은 데이터를 venues 형식으로 변환
-    venues.value = data.map((venue: any) => ({
-      name: venue.facilityName || venue.name,
-      area: venue.area || venue.address,
-      region: region,
-      performances: venue.performances || [],
-      address: venue.address || `${venue.area} ${venue.facilityName}`,
-      latitude: venue.latitude,
-      longitude: venue.longitude,
-    }));
+    // 백엔드 VenueDto 필드: mt10id, fcltynm, sidonm, gugunnm, adres, la, lo, performanceCount
+    venues.value = data.map((venue: any) => {
+      const lat = venue.la ? Number(venue.la) : undefined;
+      const lon = venue.lo ? Number(venue.lo) : undefined;
+
+      const mapped = {
+        name: venue.fcltynm, // 공연장명
+        area: `${venue.sidonm} ${venue.gugunnm}`,
+        region: region, // 선택된 권역
+        performanceCount: venue.performanceCount || 0, // 공연 수
+        performances: venue.performances || [], // 공연 목록 (있는 경우)
+        address: venue.adres, // 주소
+        sidonm: venue.sidonm, // 시도명
+        gugunnm: venue.gugunnm, // 구군명
+        latitude: lat, // 위도
+        longitude: lon, // 경도
+      };
+
+      if (!lat || !lon) {
+        console.warn(`[MapModal] ⚠️ 좌표 누락: ${mapped.name} (lat: ${lat}, lon: ${lon})`);
+      } else {
+        console.log(`[MapModal] ✅ ${mapped.name} - 위도:${lat}, 경도:${lon}`);
+      }
+
+      return mapped;
+    });
 
     console.log("[MapModal] 로드된 공연장 수:", venues.value.length);
 
-    // 지도가 있으면 마커 업데이트
-    if (map.value) {
-      updateMarkers();
-    }
+    // 지도가 있으면 마커 업데이트 (filteredVenues watch에서 자동으로 처리됨)
+    // if (map.value) {
+    //   updateMarkers();
+    // }
   } catch (error) {
     console.error("[MapModal] 지역 데이터 로드 실패:", error);
     venues.value = [];
@@ -177,10 +210,14 @@ const initMap = () => {
     };
 
     map.value = new window.kakao.maps.Map(container, options);
-    console.log("[MapModal] 지도 초기화 완료");
+    console.log("[MapModal] 지도 초기화 완료, map.value:", !!map.value);
 
-    // 지도가 생성된 후 마커 업데이트
+    // 지도가 생성된 후 마커 업데이트 (반드시 실행)
     setTimeout(() => {
+      console.log(
+        "[MapModal] initMap 후 updateMarkers 호출, filteredVenues:",
+        filteredVenues.value.length
+      );
       updateMarkers();
     }, 100);
   } catch (error) {
@@ -190,40 +227,80 @@ const initMap = () => {
 
 // 마커 업데이트
 const updateMarkers = () => {
+  console.log("[MapModal] ===== updateMarkers 시작 =====");
+  console.log("[MapModal] map.value:", !!map.value);
+  console.log("[MapModal] kakao.maps:", !!window.kakao?.maps);
+  console.log("[MapModal] filteredVenues.length:", filteredVenues.value.length);
+
   if (!map.value) {
-    console.log("[MapModal] updateMarkers: 지도가 없음");
+    console.error("[MapModal] updateMarkers: 지도가 없음 - 중단");
     return;
   }
 
   if (!window.kakao?.maps) {
-    console.log("[MapModal] updateMarkers: Kakao Maps API가 없음");
+    console.error("[MapModal] updateMarkers: Kakao Maps API가 없음 - 중단");
     return;
   }
 
   console.log("[MapModal] updateMarkers: 마커 업데이트 중, venues:", filteredVenues.value.length);
 
   // 기존 마커 제거
+  console.log("[MapModal] 기존 마커 제거:", markers.value.length, "개");
   markers.value.forEach((m) => m.setMap(null));
   markers.value = [];
 
   // 새 마커 생성
-  filteredVenues.value.forEach((venue) => {
-    if (!venue.latitude || !venue.longitude) return;
+  let successCount = 0;
+  let failCount = 0;
 
-    const pos = new window.kakao.maps.LatLng(venue.latitude, venue.longitude);
+  filteredVenues.value.forEach((venue, index) => {
+    console.log(
+      `[MapModal] venue[${index}]: "${venue.name}", lat: ${venue.latitude}, lon: ${venue.longitude}`
+    );
 
-    const marker = new window.kakao.maps.Marker({
-      position: pos,
-      map: map.value,
-    });
+    if (!venue.latitude || !venue.longitude) {
+      console.warn(`[MapModal] ❌ 좌표 없음: ${venue.name}`);
+      failCount++;
+      return;
+    }
 
-    window.kakao.maps.event.addListener(marker, "click", () => {
-      selectedVenue.value = venue;
-      map.value.panTo(pos);
-    });
+    try {
+      const pos = new window.kakao.maps.LatLng(venue.latitude, venue.longitude);
+      console.log(
+        `[MapModal] LatLng 생성 성공: ${venue.name} (${venue.latitude}, ${venue.longitude})`
+      );
 
-    markers.value.push(marker);
+      // 안이 채워진 빨간색 핀 SVG로 마커 이미지 설정
+      const markerImage = new window.kakao.maps.MarkerImage(
+        'data:image/svg+xml;utf8,<svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 38C16 38 29 23.6928 29 14.5C29 7.04416 23.1797 1 16 1C8.8203 1 3 7.04416 3 14.5C3 23.6928 16 38 16 38Z" stroke="%23EF4444" stroke-width="3" fill="%23EF4444"/><circle cx="16" cy="15" r="5" stroke="white" stroke-width="3" fill="white"/></svg>',
+        new window.kakao.maps.Size(28, 36),
+        { offset: new window.kakao.maps.Point(16, 40) }
+      );
+
+      const marker = new window.kakao.maps.Marker({
+        position: pos,
+        map: map.value,
+        image: markerImage,
+      });
+      console.log(`[MapModal] ✅ 마커 생성 성공: ${venue.name}`);
+
+      window.kakao.maps.event.addListener(marker, "click", () => {
+        selectedVenue.value = venue;
+        map.value.panTo(pos);
+      });
+
+      markers.value.push(marker);
+      successCount++;
+    } catch (error) {
+      console.error(`[MapModal] ❌ 마커 생성 실패: ${venue.name}`, error);
+      failCount++;
+    }
   });
+
+  console.log(`[MapModal] ===== 마커 생성 완료 =====`);
+  console.log(
+    `[MapModal] 성공: ${successCount}개, 실패: ${failCount}개, 총: ${markers.value.length}개`
+  );
 
   console.log("[MapModal] updateMarkers: 마커 생성 완료, 총 개수:", markers.value.length);
 
@@ -301,14 +378,6 @@ const renderMapIfPossible = async () => {
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   const container = document.getElementById("map");
-  console.log(
-    "[MapModal] #map 컨테이너:",
-    container,
-    "offsetWidth:",
-    container?.offsetWidth,
-    "offsetHeight:",
-    container?.offsetHeight
-  );
 
   if (!container) {
     console.error("[MapModal] 컨테이너가 없습니다. 다시 시도합니다.");
@@ -354,12 +423,18 @@ watch(kakaoReady, async (ready) => {
   }
 });
 
-// filteredVenues 변경 시 마커 업데이트
-watch(filteredVenues, () => {
-  if (map.value) {
-    updateMarkers();
-  }
-});
+// filteredVenues 변경 시 마커 업데이트 (지도가 이미 초기화된 경우에만)
+watch(
+  filteredVenues,
+  () => {
+    console.log("[MapModal] filteredVenues 변경 감지, map.value:", !!map.value);
+    if (map.value) {
+      console.log("[MapModal] 마커 업데이트 시작");
+      updateMarkers();
+    }
+  },
+  { flush: "post" }
+); // DOM 업데이트 후 실행
 
 // selectedVenue 변경 시 지도 중심 이동
 watch(selectedVenue, (venue) => {
@@ -475,11 +550,14 @@ watch(selectedVenue, (venue) => {
                       </div>
                       <div class="flex-1 min-w-0">
                         <h4 class="text-white mb-1 truncate font-bold">{{ venue.name }}</h4>
+                        <p class="text-xs text-gray-300 mb-1">
+                          {{ venue.sidonm }} {{ venue.gugunnm }}
+                        </p>
                         <p class="text-sm text-gray-400 mb-3 line-clamp-1">{{ venue.address }}</p>
                         <div class="flex items-center gap-4 text-xs text-gray-500">
                           <div class="flex items-center gap-1">
                             <Ticket class="h-3 w-3" />
-                            <span>{{ venue.performances.length }}개 공연</span>
+                            <span>{{ venue.performanceCount }}개 공연</span>
                           </div>
                           <div class="flex items-center gap-1">
                             <Info class="h-3 w-3" />
@@ -530,8 +608,12 @@ watch(selectedVenue, (venue) => {
               <span class="text-white">{{ selectedVenue.area }}</span>
             </div>
             <div class="flex justify-between">
+              <span class="text-gray-400">전체 주소</span>
+              <span class="text-white">{{ selectedVenue.address }}</span>
+            </div>
+            <div class="flex justify-between">
               <span class="text-gray-400">공연 수</span>
-              <span class="text-white">{{ selectedVenue.performances.length }}개</span>
+              <span class="text-white">{{ selectedVenue.performanceCount }}개</span>
             </div>
           </div>
         </div>

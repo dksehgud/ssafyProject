@@ -27,8 +27,9 @@ public class VenueService {
         return venueMapper.findByArea(area);
     }
 
-    // 권역별 공연장 조회 (공연 개수가 1개 이상인 경우만)
-    public List<VenueDto> getVenuesByRegion(VenueRequest venueRequest) {
+    // 권역별 공연장 조회 (공연 개수가 1개 이상인 경우만) - genreId optional
+    public List<VenueDto> getVenuesByRegion(String region, Integer genreId) {
+        VenueRequest venueRequest = new VenueRequest(region, genreId);
         return venueMapper.findByRegion(venueRequest);
     }
 
