@@ -26,6 +26,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const isHomePage = computed(() => route.path === '/')
+const isMyPage = computed(() => route.path === '/mypage')
+const showNavigation = computed(() => isHomePage.value || isMyPage.value)
 const isDropdownOpen = ref(false)
 const isMobileMenuOpen = ref(false)
 
@@ -152,8 +154,8 @@ const handleLogout = async () => {
         </RouterLink>
 
         <!-- Desktop Navigation -->
-        <nav v-if="isHomePage" class="hidden lg:flex items-center gap-4 xl:gap-6">
-          <button 
+        <nav v-if="showNavigation" class="hidden lg:flex items-center gap-4 xl:gap-6">
+          <button
             v-for="category in ['콘서트', '뮤지컬', '연극', '클래식']"
             :key="category"
             @click="handleCategoryClick(category)"
@@ -166,7 +168,7 @@ const handleLogout = async () => {
 
         <!-- Mobile Menu Button -->
         <button 
-          v-if="isHomePage"
+          v-if="showNavigation"
           @click="isMobileMenuOpen = !isMobileMenuOpen"
           class="lg:hidden text-gray-300 hover:text-white p-2"
         >
@@ -232,19 +234,11 @@ const handleLogout = async () => {
                 </template>
 
                 <button
-                  @click="goToBookingPage"
-                  class="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-2"
-                >
-                  <User class="h-4 w-4" />
-                  예매내역/조회
-                </button>
-
-                <button
                   @click="goToMyPage"
                   class="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-2"
                 >
                   <User class="h-4 w-4" />
-                  회원정보
+                  마이페이지
                 </button>
 
                 <div class="border-t border-gray-800"></div>
@@ -281,7 +275,7 @@ const handleLogout = async () => {
 
     <!-- Mobile Navigation Menu -->
     <Transition name="dropdown">
-      <div v-if="isMobileMenuOpen && isHomePage" class="lg:hidden bg-gray-900 border-t border-gray-800">
+      <div v-if="isMobileMenuOpen && showNavigation" class="lg:hidden bg-gray-900 border-t border-gray-800">
         <nav class="container mx-auto px-4 py-4 flex flex-col gap-2">
           <button 
             v-for="category in ['콘서트', '뮤지컬', '연극', '클래식']"
