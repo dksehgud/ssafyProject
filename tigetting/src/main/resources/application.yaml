@@ -31,5 +31,7 @@ jwt:
   secret: ${JWT_SECRET:THIS_IS_A_LONG_RANDOM_PLAIN_SECRET_WITH_32+_CHARS_1234567890abcdef}
   access-token-validity-ms: 3600000
 
-# server:
-#   port: 44
+queue:
+  max-active-tokens: 1
+  max-inactive-seconds: 120
+  wait-time-per-person: 10

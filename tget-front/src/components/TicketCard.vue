@@ -1,13 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { Calendar, MapPin } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
 import ImageWithFallback from './figma/ImageWithFallback.vue'
 import Card from './ui/Card.vue'
-import LoadingModal from './LoadingModal.vue'
-import { calculateQueueDuration } from '@/constants/timing.ts'
-import { ticketService } from '@/api/ticketService'
 
 interface Props {
   performanceId: string
@@ -24,24 +20,6 @@ const props = defineProps<Props>()
 const router = useRouter()
 
 /* ======================
-   Queue 상태
-====================== */
-const showQueue = ref(false)
-const queueNumber = ref(Math.floor(Math.random() * 100) + 1)
-let queueTimer: number | null = null
-
-
-// 취소 핸들러 추가
-const handleCancelQueue = () => {
-  // 타이머 제거
-  if (queueTimer !== null) {
-    clearTimeout(queueTimer)
-    queueTimer = null
-  }
-  showQueue.value = false
-  queueNumber.value = 0
-}
-/* ======================
    날짜 포맷
 ====================== */
 const formatDate = (start: string, end: string) => {
@@ -57,51 +35,14 @@ const formatDate = (start: string, end: string) => {
 }
 
 /* ======================
-   클릭 → 큐 → 이동
+   클릭 → 상세 이동
 ====================== */
-const handleClick = async () => {
-  if (showQueue.value) return
-
-  try {
-    const data = await ticketService.getQueueInfo(props.performanceId)
-    const waitingCount = data.queueNumber ?? 0
-    queueNumber.value = waitingCount
-
-    // 대기자 없으면 바로 이동
-    if (waitingCount === 0) {
-      router.push(`/ticket/${props.performanceId}`)
-      return
-    }
-
-    showQueue.value = true
-    const duration = calculateQueueDuration(waitingCount)
-
-    // 기존 타이머가 있다면 제거
-    if (queueTimer !== null) {
-      clearTimeout(queueTimer)
-    }
-
-    queueTimer = window.setTimeout(() => {
-      showQueue.value = false
-      router.push(`/ticket/${props.performanceId}`)
-      queueTimer = null
-    }, duration)
-  } catch (e) {
+const handleClick = () => {
     router.push(`/ticket/${props.performanceId}`)
-  }
 }
 </script>
 
 <template>
-  <!-- Queue Loading Modal -->
-  <Transition name="fade">
-    <LoadingModal
-      v-if="showQueue"
-      :queueNumber="queueNumber"
-      @close="handleCancelQueue"
-    />
-  </Transition>
-
   <!-- Ticket Card -->
   <div
     class="h-full relative transition-transform duration-300 ease-out

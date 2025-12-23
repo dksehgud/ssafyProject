@@ -29,7 +29,8 @@ public class VenueController {
 
     // 권역별 공연장 조회 (서울, 경기/인천, 충청/강원, 대구/경북, 부산/경남, 광주/전라, 제주, 기타)
     @GetMapping("/region")
-    public ResponseEntity<List<VenueDto>> getVenuesByRegion(@RequestParam String region, @RequestParam Integer genreId) {
+    public ResponseEntity<List<VenueDto>> getVenuesByRegion(@RequestParam String region,
+            @RequestParam(required = false) Integer genreId) {
         System.out.println("🔍 권역별 공연장 조회 요청 - region 권역: " + region);
         List<VenueDto> venues = venueService.getVenuesByRegion(region, genreId);
         System.out.println("venues performanceCount : " + venues.get(0).toString());
@@ -55,7 +56,8 @@ public class VenueController {
             @RequestParam(required = false) String region) {
         System.out.println("🔍 공연장 상세정보 조회 요청 - mt10id: " + mt10id + ", genreId: " + genreId + ", region: " + region);
         VenueDetailResponseDto detail = venueService.getVenueDetail(mt10id, genreId, region);
-        System.out.println("✅ 공연장 상세정보 조회 완료 - " + detail.getVenue().getFcltynm() + ", 공연 수: " + detail.getPerformances().size());
+        System.out.println(
+                "✅ 공연장 상세정보 조회 완료 - " + detail.getVenue().getFcltynm() + ", 공연 수: " + detail.getPerformances().size());
         return ResponseEntity.ok(detail);
     }
 

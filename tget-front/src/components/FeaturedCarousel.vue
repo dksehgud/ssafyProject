@@ -6,9 +6,6 @@ import CardContent from './ui/CardContent.vue'
 import Button from './ui/Button.vue'
 import { Calendar, MapPin, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import ImageWithFallback from './figma/ImageWithFallback.vue'
-import LoadingModal from './LoadingModal.vue'
-import { ticketService } from '@/api/ticketService'
-import { calculateQueueDuration } from '@/constants/timing'
 
 interface TicketData {
   performanceId: string
@@ -27,21 +24,6 @@ const props = defineProps<{
 
 const router = useRouter()
 const currentIndex = ref(0)
-
-const showQueue = ref(false)
-const queueNumber = ref(0)
-let queueTimer: number | null = null
-
-// 취소 핸들러 추가
-const handleCancelQueue = () => {
-  // 타이머 제거
-  if (queueTimer !== null) {
-    clearTimeout(queueTimer)
-    queueTimer = null
-  }
-  showQueue.value = false
-  queueNumber.value = 0
-}
 
 const getPrevIndex = () => {
   return currentIndex.value === 0 ? props.items.length - 1 : currentIndex.value - 1
@@ -78,45 +60,13 @@ const formatDate = (start: string, end: string) => {
   return `${formatDateStr(startDate)} ~ ${formatDateStr(endDate)}`
 }
 
-const navigateToDetail = async (id: string) => {
-  if (showQueue.value) return
-
-  try {
-    const data = await ticketService.getQueueInfo(id)
-    const waitingCount = data.queueNumber ?? 0
-
-    queueNumber.value = waitingCount
-
-    // 대기자 없으면 바로 이동
-    if (waitingCount === 0) {
-      router.push(`/ticket/${id}`)
-      return
-    }
-
-    showQueue.value = true
-    const duration = calculateQueueDuration(waitingCount)
-
-    // ⭐ 기존 타이머가 있다면 제거
-    if (queueTimer !== null) {
-      clearTimeout(queueTimer)
-    }
-
-    queueTimer = window.setTimeout(() => {
-      showQueue.value = false
-      router.push(`/ticket/${id}`)
-      queueTimer = null
-    }, duration)
-
-  } catch (error) {
-    console.error('Queue check failed:', error)
+const navigateToDetail = (id: string) => {
     router.push(`/ticket/${id}`)
-  }
 }
 </script>
 
 <template>
   <div class="relative w-full mb-16">
-    <LoadingModal v-if="showQueue" :queueNumber="queueNumber" @close="handleCancelQueue"/>
     
     <div class="flex items-center gap-4">
       <!-- Left Card + Arrow -->

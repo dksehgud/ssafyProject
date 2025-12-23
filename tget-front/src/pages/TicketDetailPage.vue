@@ -3,8 +3,10 @@ import { ticketService } from "@/api/ticketService";
 import ImageWithFallback from "@/components/figma/ImageWithFallback.vue";
 import NetflixCalendar from "@/components/NetflixCalendar.vue";
 import SeatSelectionModal from "@/components/SeatSelectionModal.vue";
+import QueuePollingModal from "@/components/QueuePollingModal.vue";
 import Badge from "@/components/ui/Badge.vue";
 import Button from "@/components/ui/Button.vue";
+import { queueService } from "@/api/queueService";
 import Separator from "@/components/ui/Separator.vue";
 import { ArrowLeft, Building, Calendar, Clock, MapPin, Tag, User, Users } from "lucide-vue-next";
 import { onMounted, ref } from "vue";
@@ -15,9 +17,45 @@ const router = useRouter();
 const id = route.params.id as string;
 
 const isSeatModalOpen = ref(false);
+const isQueueModalOpen = ref(false);
+const queueToken = ref("");
+const initialQueueData = ref({ waiting: 0, estimatedTime: 0 });
+
 const selectedDate = ref<Date | null>(null);
 const ticket = ref<any>(null);
 const isLoading = ref(true);
+
+const handleReserve = async () => {
+  if (!ticket.value || !selectedDate.value) return;
+
+  try {
+    const data = await queueService.checkQueue(ticket.value.performanceId, 1); // TODO: scheduleId if needed
+    
+    // Direct Entry
+    if (data.canProceedDirectly || !data.requiresQueue) {
+        queueToken.value = data.sessionId; // Save session ID just in case
+        isSeatModalOpen.value = true;
+        return;
+    }
+
+    // Waiting Required
+    queueToken.value = data.sessionId;
+    initialQueueData.value = {
+        waiting: data.currentWaitingCount || 0,
+        estimatedTime: data.estimatedWaitTime || 0
+    };
+    isQueueModalOpen.value = true;
+
+  } catch (error) {
+    console.error("Queue check error:", error);
+    alert("예매 대기열 확인 중 오류가 발생했습니다.");
+  }
+};
+
+const onQueueComplete = () => {
+    isQueueModalOpen.value = false;
+    isSeatModalOpen.value = true;
+};
 
 onMounted(async () => {
   try {
@@ -257,7 +295,7 @@ const formatDate = (start: string, end: string) => {
             <div class="space-y-4">
               <Button
                 class="w-full bg-red-600 hover:bg-red-700 text-white h-14 text-lg disabled:bg-gray-700 disabled:cursor-not-allowed"
-                @click="isSeatModalOpen = true"
+                @click="handleReserve"
                 :disabled="ticket.state === '공연종료' || !selectedDate"
               >
                 {{
@@ -339,6 +377,17 @@ const formatDate = (start: string, end: string) => {
         </Transition>
       </div>
     </div>
+
+    <!-- 대기열 폴링 모달 -->
+    <QueuePollingModal
+        v-if="isQueueModalOpen"
+        :token="queueToken"
+        :performanceId="ticket.performanceId"
+        :initialWaitingCount="initialQueueData.waiting"
+        :initialEstimatedTime="initialQueueData.estimatedTime"
+        @close="isQueueModalOpen = false"
+        @complete="onQueueComplete"
+    />
 
     <!-- 좌석 선택 모달 -->
     <SeatSelectionModal

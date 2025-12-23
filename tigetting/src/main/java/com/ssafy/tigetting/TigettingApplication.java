@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class TigettingApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(TigettingApplication.class, args);
+        SpringApplication.run(TigettingApplication.class, args);
 	}
 
 }
