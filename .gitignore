@@ -929,3 +929,7 @@ fabric.properties
 
 # Docker volume data
 db_data/
+
+# Project specific ignores
+.idea/
+*.iml
