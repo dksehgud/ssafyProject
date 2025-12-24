@@ -14,7 +14,7 @@
     <insert id="saveAll" parameterType="java.util.List">
         INSERT INTO ai_recommendations (genre_id, mt20id, rank_order, generated_at)
         VALUES
-        <foreach collection="list" item="item" separator=",">
+        <foreach collection="recommendations" item="item" separator=",">
             (#{item.genreId}, #{item.mt20id}, #{item.rankOrder}, #{item.generatedAt})
         </foreach>
     </insert>

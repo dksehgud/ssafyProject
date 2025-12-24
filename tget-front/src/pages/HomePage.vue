@@ -304,7 +304,7 @@ const scrollRecommend = (direction: "left" | "right") => {
     <!-- AI 추천 섹션: 캐러셀 바로 아래, 카테고리(클래식 등) 위에 노출 -->
     <Transition name="fade" appear>
       <div v-if="recommendations.length" class="container mx-auto px-4 mt-6 mb-8 sm:mb-12">
-        <h2 class="mb-4 sm:mb-6 text-white text-lg sm:text-xl font-bold">AI 추천 공연 <small class="text-sm text-gray-500">({{ recommendationType || 'base' }})</small></h2>
+        <h2 class="mb-4 sm:mb-6 text-white text-lg sm:text-xl font-bold">AI 추천 공연</h2>
         
         <div class="relative group">
           <!-- Left Button -->

@@ -102,6 +102,9 @@ public class SecurityConfig {
                 // 공연 정보 조회 허용
                 .requestMatchers("/performances/**").permitAll()
 
+                // AI 추천 API 허용
+                .requestMatchers("/api/recommendations/**").permitAll()
+
                 // 공연장 관련 GET 요청은 로그인 불필요 (지도/조회용)
                 .requestMatchers(HttpMethod.GET, "/api/venues/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/api/venues/**").permitAll()

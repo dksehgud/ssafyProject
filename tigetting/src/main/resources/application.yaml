@@ -63,5 +63,5 @@ recommendation:
   batch:
     cron: "0 0 3 * * *"  # 매일 새벽 3시
   counts:
-    home: 500
-    genre: 100
+    home: 10
+    genre: 5

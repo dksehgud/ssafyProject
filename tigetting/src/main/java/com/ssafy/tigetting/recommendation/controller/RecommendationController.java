@@ -112,4 +112,38 @@ public class RecommendationController {
                     .body("배치 작업 실패: " + e.getMessage());
         }
     }
+
+    /**
+     * AI 추천 테스트 (특정 장르만)
+     */
+    @PostMapping("/test-ai")
+    public ResponseEntity<String> testAI(@RequestParam(required = false) Integer genreId) {
+        log.info("🧪 AI 추천 테스트 - genreId: {}", genreId);
+
+        try {
+            if (genreId == null) {
+                genreId = 1; // 기본값: 클래식
+            }
+            
+            // 전체 공연 조회 후 장르별 추천 생성
+            List<com.ssafy.tigetting.recommendation.dto.PerformanceForAI> allPerformances = 
+                recommendationService.getAllActivePerformances();
+            
+            recommendationService.generateBaseRecommendationsForPage(genreId, allPerformances);
+            
+            return ResponseEntity.ok(String.format(
+                "AI 추천 테스트 완료 - 장르 %d\n" +
+                "DB에서 ai_recommendations 테이블을 확인하세요.\n" +
+                "SELECT * FROM ai_recommendations WHERE genre_id = %d;",
+                genreId, genreId));
+        } catch (Exception e) {
+            log.error("AI 추천 테스트 실패", e);
+            return ResponseEntity.ok(String.format(
+                "AI API 호출 실패 (폴백 사용됨)\n" +
+                "에러: %s\n" +
+                "폴백으로 최신순 추천이 저장되었습니다.",
+                e.getMessage()));
+        }
+    }
 }
+
