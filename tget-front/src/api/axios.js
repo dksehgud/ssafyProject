@@ -31,6 +31,9 @@ api.interceptors.response.use(
     (error) => {
         // Handle global errors here
         if (error.response) {
+            // Auth 관련 엔드포인트는 컴포넌트에서 직접 처리하도록 제외
+            const isAuthEndpoint = error.config?.url?.includes('/auth/')
+
             switch (error.response.status) {
                 case 401:
                     // Unauthorized: Clear token and redirect to login
@@ -40,16 +43,23 @@ api.interceptors.response.use(
                     toast.error('로그인이 만료되었습니다. 다시 로그인해주세요.')
                     break
                 case 403:
-                    toast.error('접근 권한이 없습니다.')
+                    if (!isAuthEndpoint) {
+                        toast.error('접근 권한이 없습니다.')
+                    }
                     break
                 case 404:
                     // toast.error('요청한 리소스를 찾을 수 없습니다.') // Optional: might be handled in component
                     break
                 case 500:
-                    toast.error('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+                    // Auth 엔드포인트는 컴포넌트에서 처리
+                    if (!isAuthEndpoint) {
+                        toast.error('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+                    }
                     break
                 default:
-                    toast.error('알 수 없는 오류가 발생했습니다.')
+                    if (!isAuthEndpoint) {
+                        toast.error('알 수 없는 오류가 발생했습니다.')
+                    }
             }
         } else if (error.request) {
             // The request was made but no response was received

@@ -20,7 +20,7 @@ export const authService = {
         //   currentPassword?: string,  // 비밀번호 변경 시에만 필요
         //   newPassword?: string       // 비밀번호 변경 시에만 필요
         // }
-        
+
         const requestData = {
             email: userData.userEmail,
             name: userData.name,
@@ -49,6 +49,27 @@ export const authService = {
 
     async getProfile() {
         const response = await api.get('/auth/me')
+        return response.data
+    },
+
+    /**
+     * 이메일 인증번호 전송
+     * @param {string} email - 인증번호를 받을 이메일
+     * @returns {Promise} 인증번호 전송 결과
+     */
+    async sendVerificationCode(email) {
+        const response = await api.post('/auth/send-verification', { email })
+        return response.data
+    },
+
+    /**
+     * 이메일 인증번호 확인
+     * @param {string} email - 이메일
+     * @param {string} code - 인증번호
+     * @returns {Promise} 인증 결과
+     */
+    async verifyCode(email, code) {
+        const response = await api.post('/auth/verify-code', { email, code })
         return response.data
     }
 }

@@ -1,5 +1,6 @@
 -- Database creation handled manually
 -- use Tget; commented out to use CLI argument
+use Tget;
 
 -- 모든 테이블 삭제
 DROP TABLE IF EXISTS performance_styurls CASCADE;
@@ -130,32 +131,61 @@ CREATE TABLE performance_styurls (
         ON DELETE CASCADE ON UPDATE CASCADE
 );
 
--- 회원 권한 테이블
-CREATE TABLE roles (
-	roleid INT NOT NULL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL
-);
-
--- 회원 정보 테이블
-CREATE TABLE users (
-	userid INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '기본 생성 id',
-    email VARCHAR(255) NOT NULL COMMENT '이메일',
-    password VARCHAR(255) NOT NULL COMMENT '비밀번호', -- 스프링에서 encoding 돼서 처리.
-    name VARCHAR(255) NOT NULL COMMENT '이름',
-    phone VARCHAR(50) NOT NULL COMMENT '전화번호',
-    roleid INT NOT NULL COMMENT '권한',
-    register DATETIME NOT NULL COMMENT '가입일',
-    
-    CONSTRAINT fk_user_role FOREIGN KEY (roleid) REFERENCES roles(roleid)
-);
-
 -- 회원 공연 내역 테이블
 CREATE TABLE users_performances (
-	userid INT PRIMARY KEY COMMENT '기본 생성 id',
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '내역 ID',
+    userid INT NOT NULL COMMENT '사용자 ID',
     mt20id VARCHAR(100) NOT NULL COMMENT '공연 ID',
+    genreid INT COMMENT '장르 ID (비정규화 - AI 추천용)',
+    view_date DATETIME NOT NULL COMMENT '관람일',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '등록일',
     
-    CONSTRAINT fk_user_performance_performance FOREIGN KEY (mt20id) REFERENCES performances(mt20id),
-    CONSTRAINT fk_user_performance_user FOREIGN KEY (userid) REFERENCES users(userid)
+    CONSTRAINT fk_user_performance_user FOREIGN KEY (userid) REFERENCES users(userid) ON DELETE CASCADE,
+    CONSTRAINT fk_user_performance_performance FOREIGN KEY (mt20id) REFERENCES performances(mt20id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_performance_genre FOREIGN KEY (genreid) REFERENCES genres(genreid),
+    
+    INDEX idx_user_performances_user (userid),
+    INDEX idx_user_performances_date (view_date)
+);
+
+-- Create queue_tokens table
+CREATE TABLE IF NOT EXISTS `queue_tokens` (
+  `token_id` bigint NOT NULL AUTO_INCREMENT,
+  `token` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint NOT NULL,
+  `performance_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `position_in_queue` int DEFAULT NULL,
+  `estimated_wait_time` int DEFAULT NULL,
+  `issued_at` datetime(6) NOT NULL,
+  `expires_at` datetime(6) DEFAULT NULL,
+  `activated_at` datetime(6) DEFAULT NULL,
+  `used_at` datetime(6) DEFAULT NULL,
+  `booking_expires_at` datetime(6) DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL,
+  `updated_at` datetime(6) NOT NULL,
+  PRIMARY KEY (`token_id`),
+  UNIQUE KEY `uk_token` (`token`),
+  KEY `idx_user_performance` (`user_id`,`performance_id`),
+  KEY `idx_performance_status_issued` (`performance_id`,`status`,`issued_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_recommendations 
+( id INT AUTO_INCREMENT PRIMARY KEY, genre_id INT NULL COMMENT '장르 ID (NULL=home/전체, 1=클래식, 2=콘서트, 3=뮤지컬, 4=연극)', 
+mt20id VARCHAR(100) NOT NULL COMMENT '추천 공연 ID', 
+rank_order INT NOT NULL COMMENT '추천 순위 (1~500 for home, 1~100 for others)', 
+generated_at DATETIME NOT NULL COMMENT '생성 시각', INDEX idx_genre_id (genre_id), 
+INDEX idx_genre_rank (genre_id, rank_order), INDEX idx_generated_at (generated_at) );
+
+-- 이메일 인증 테이블
+CREATE TABLE IF NOT EXISTS email_verifications (
+    email VARCHAR(255) PRIMARY KEY COMMENT '이메일',
+    verification_code VARCHAR(10) NOT NULL COMMENT '인증 코드',
+    expiry_time DATETIME NOT NULL COMMENT '만료 시간',
+    verified BOOLEAN DEFAULT FALSE COMMENT '인증 완료 여부',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시간',
+    INDEX idx_expiry_time (expiry_time),
+    INDEX idx_verified (verified)
 );
 
 -- 인덱스 생성 (조회 성능 향상)

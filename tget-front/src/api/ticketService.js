@@ -3,11 +3,10 @@ import { localAxios } from "@/util/http-commons";
 const api = localAxios();
 
 export const ticketService = {
-  async getTickets(params) {
+  async getTickets(params, token) {
     // params can include category, area, etc.
-    // const response = await api.get('/tickets', { params })
-    // 백엔드 엔드포인트: GET /performances/main
-    const response = await api.get("/performances/main", { params });
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const response = await api.get("/performances/main", { params, headers });
     return response.data;
   },
 

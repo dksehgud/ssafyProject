@@ -3,9 +3,10 @@ import { ticketService } from "@/api/ticketService"; // 백엔드 연동 시 사
 import CategoryRow from "@/components/CategoryRow.vue";
 import FeaturedCarousel from "@/components/FeaturedCarousel.vue";
 import MapModal from "@/components/MapModal.vue";
+import TicketCard from "@/components/TicketCard.vue";
 import Button from "@/components/ui/Button.vue";
-import { Map } from "lucide-vue-next";
-import { computed, onMounted, ref } from "vue";
+import { ChevronLeft, ChevronRight, Map } from "lucide-vue-next";
+import { computed, onMounted, ref, watch } from "vue";
 // import { ticketData } from '@/data/ticketData' // 정적 데이터 사용 (주석 처리)
 
 // Type definition for ticket data
@@ -31,34 +32,132 @@ const props = defineProps<Props>();
 
 const isMapModalOpen = ref(false);
 const tickets = ref<TicketData[]>([]);
+const recommendations = ref<TicketData[]>([]);
+const recommendationType = ref<string | null>(null);
 const isLoading = ref(true);
 const lastSelectedRegion = ref<string>("서울"); // 마지막으로 선택한 지역 저장
 
-onMounted(async () => {
-  try {
-    // 백엔드 API 호출
-    const data = await ticketService.getTickets();
-    console.log("🔥 백엔드 응답 데이터:", data);
+// Helper: map backend PerformanceDto -> frontend TicketData
+const mapPerformance = (item: any): TicketData => {
+  // genreId를 한글 카테고리명으로 매핑
+  const genreIdToCategory: Record<number, string> = {
+    1: "클래식",
+    2: "콘서트",
+    3: "뮤지컬",
+    4: "연극",
+  };
+  
+  const categoryName = item.genreId 
+    ? genreIdToCategory[item.genreId] || item.genreName || item.category || ""
+    : item.genreName || item.category || "";
+  
+  return {
+    performanceId: item.mt20id || item.id || item.performanceId || "",
+    title: item.prfnm || item.title || "",
+    dateStart: item.prfpdfrom || item.dateStart || "",
+    dateEnd: item.prfpdto || item.dateEnd || "",
+    facilityName: item.fcltynm || item.facilityName || "",
+    ticketPrice: item.ticketPrice || "",
+    poster: item.poster || item.image || "",
+    area: item.area || item.region || "",
+    genre: item.genreName || item.genre || "",
+    state: item.prfstate || item.state || "",
+    category: categoryName,
+  };
+};
 
-    // 백엔드 DTO(PerformanceDto) -> 프론트엔드 TicketData 변환
-    tickets.value = data.map((item: any) => ({
-      performanceId: item.mt20id, // ID
-      title: item.prfnm,
-      dateStart: item.prfpdfrom,
-      dateEnd: item.prfpdto,
-      facilityName: item.fcltynm,
-      ticketPrice: "", // DTO에 미포함 (추후 추가 필요 시 여기서 처리)
-      poster: item.poster,
-      area: item.area,
-      genre: item.genreName,
-      state: item.prfstate,
-      category: item.genreName, // 카테고리로 사용
-    }));
+// API 호출 함수 (재사용 가능)
+const loadPerformances = async () => {
+  try {
+    isLoading.value = true;
+    
+    // genreId 파라미터 준비
+    const params: any = {};
+    if (genreId.value !== null) {
+      params.genreId = genreId.value;
+    }
+
+    console.log("🎭 현재 선택된 카테고리:", props.selectedCategory);
+    console.log("🔢 genreId:", genreId.value);
+
+    // JWT 토큰 가져오기 (localStorage에서)
+    const token = localStorage.getItem("accessToken");
+    console.log("🔑 JWT 토큰:", token ? "있음" : "없음");
+
+    // 백엔드 API 호출 (토큰 전달)
+    const data = await ticketService.getTickets(params, token);
+    console.log("🔥 백엔드 응답 데이터:", data);
+    console.log("📊 응답 구조 확인:", {
+      isArray: Array.isArray(data),
+      hasAllPerformances: data?.allPerformances !== undefined,
+      hasRecommendations: data?.recommendations !== undefined,
+      recommendationsIsArray: Array.isArray(data?.recommendations),
+      recommendationsLength: data?.recommendations?.length,
+      recommendationType: data?.recommendationType
+    });
+
+    // 새 응답(PagePerformanceResponse) 또는 기존 응답(배열) 모두 처리
+    let performanceList: any[] = [];
+
+    if (Array.isArray(data)) {
+      performanceList = data;
+    } else if (data && data.allPerformances) {
+      performanceList = data.allPerformances;
+
+      // 추천 데이터가 있을 경우 저장
+      if (Array.isArray(data.recommendations)) {
+        recommendations.value = data.recommendations.map((item: any) => mapPerformance(item));
+        console.log("✅ AI 추천 데이터 설정됨:", recommendations.value.length, "개");
+      } else {
+        console.log("⚠️ recommendations가 배열이 아니거나 없음:", data.recommendations);
+        recommendations.value = []; // 추천 데이터 초기화
+      }
+
+      if (data.recommendationType) {
+        recommendationType.value = data.recommendationType;
+        console.log("✅ 추천 타입 설정됨:", recommendationType.value);
+      } else {
+        recommendationType.value = null; // 추천 타입 초기화
+      }
+    } else if (data && data.data && Array.isArray(data.data)) {
+      // axios 응답 래핑(data.data)인 경우
+      performanceList = data.data;
+    }
+
+    tickets.value = performanceList.map((item: any) => mapPerformance(item));
+    console.log("🎫 총 티켓 수:", tickets.value.length);
+    
+    // 카테고리별 분류 확인
+    const categoryCount: Record<string, number> = {};
+    tickets.value.forEach(ticket => {
+      categoryCount[ticket.category] = (categoryCount[ticket.category] || 0) + 1;
+    });
+    console.log("📂 카테고리별 티켓 수:", categoryCount);
+    
+    // 연극 카테고리 필터링 확인
+    if (props.selectedCategory === "연극") {
+      const theaterTickets = tickets.value.filter(t => t.category === "연극");
+      console.log("🎭 연극 필터링 결과:", theaterTickets.length, "개");
+      if (theaterTickets.length === 0) {
+        console.warn("⚠️ 연극 데이터가 없습니다. 백엔드 응답을 확인하세요.");
+      }
+    }
   } catch (error) {
     console.error("Failed to fetch tickets:", error);
   } finally {
     isLoading.value = false;
   }
+};
+
+// 초기 로드
+onMounted(() => {
+  loadPerformances();
+});
+
+// selectedCategory 변경 시 데이터 다시 로드
+watch(() => props.selectedCategory, (newCategory, oldCategory) => {
+  console.log(`🔄 카테고리 변경: ${oldCategory} → ${newCategory}`);
+  loadPerformances();
 });
 
 const getRegion = (area: string): string => {
@@ -152,6 +251,41 @@ const activeRegion = computed(() => {
 const updateLastSelectedRegion = (region: string) => {
   lastSelectedRegion.value = region;
 };
+
+// AI 추천 섹션 스크롤 관련
+const recommendScrollRef = ref<HTMLDivElement | null>(null);
+const showRecommendLeftButton = ref(false);
+const showRecommendRightButton = ref(true);
+
+const checkRecommendScroll = () => {
+  const container = recommendScrollRef.value;
+  if (!container) return;
+
+  showRecommendLeftButton.value = container.scrollLeft > 0;
+  showRecommendRightButton.value =
+    container.scrollLeft < container.scrollWidth - container.clientWidth - 10;
+};
+
+const scrollRecommend = (direction: "left" | "right") => {
+  const container = recommendScrollRef.value;
+  if (!container) return;
+
+  const containerWidth = container.clientWidth;
+  const scrollAmount = containerWidth - 100;
+
+  const newScrollLeft =
+    direction === "left"
+      ? container.scrollLeft - scrollAmount
+      : container.scrollLeft + scrollAmount;
+
+  container.scrollTo({
+    left: newScrollLeft,
+    behavior: "smooth",
+  });
+
+  setTimeout(checkRecommendScroll, 300);
+};
+
 </script>
 
 <template>
@@ -164,6 +298,51 @@ const updateLastSelectedRegion = (region: string) => {
     <Transition name="fade-up" appear>
       <div class="container mx-auto px-4">
         <FeaturedCarousel :items="carouselData" />
+      </div>
+    </Transition>
+
+    <!-- AI 추천 섹션: 캐러셀 바로 아래, 카테고리(클래식 등) 위에 노출 -->
+    <Transition name="fade" appear>
+      <div v-if="recommendations.length" class="container mx-auto px-4 mt-6 mb-8 sm:mb-12">
+        <h2 class="mb-4 sm:mb-6 text-white text-lg sm:text-xl font-bold">AI 추천 공연 <small class="text-sm text-gray-500">({{ recommendationType || 'base' }})</small></h2>
+        
+        <div class="relative group">
+          <!-- Left Button -->
+          <Transition name="fade">
+            <button
+              v-if="showRecommendLeftButton"
+              @click="scrollRecommend('left')"
+              class="absolute left-1 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-black/50 hover:bg-black/80 flex items-center justify-center transition-all backdrop-blur-sm opacity-0 group-hover:opacity-100"
+            >
+              <ChevronLeft class="w-5 h-5 sm:w-8 sm:h-8 text-white" />
+            </button>
+          </Transition>
+
+          <!-- Right Button -->
+          <Transition name="fade">
+            <button
+              v-if="showRecommendRightButton"
+              @click="scrollRecommend('right')"
+              class="absolute right-1 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-black/50 hover:bg-black/80 flex items-center justify-center transition-all backdrop-blur-sm opacity-0 group-hover:opacity-100"
+            >
+              <ChevronRight class="w-5 h-5 sm:w-8 sm:h-8 text-white" />
+            </button>
+          </Transition>
+
+          <!-- Scroll Container -->
+          <div
+            ref="recommendScrollRef"
+            @scroll="checkRecommendScroll"
+            class="flex gap-2 sm:gap-4 overflow-x-auto scrollbar-hide pb-2"
+            style="scrollbar-width: none; -ms-overflow-style: none;"
+          >
+            <div v-for="r in recommendations" :key="r.performanceId" class="flex-none w-[280px]">
+              <TicketCard
+                v-bind="r"
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </Transition>
 
@@ -228,5 +407,15 @@ const updateLastSelectedRegion = (region: string) => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.recommend-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recommend-item {
+  /* card sizing handled inline */
 }
 </style>

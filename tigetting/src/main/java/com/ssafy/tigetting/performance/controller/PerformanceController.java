@@ -20,6 +20,10 @@ import com.ssafy.tigetting.performance.dto.PerformanceDetailDto;
 import com.ssafy.tigetting.performance.dto.PerformanceDto;
 import com.ssafy.tigetting.global.security.JwtUtil;
 import com.ssafy.tigetting.performance.service.PerformanceService;
+import com.ssafy.tigetting.recommendation.service.RecommendationService;
+import com.ssafy.tigetting.recommendation.dto.PagePerformanceResponse;
+import com.ssafy.tigetting.mapper.UserMapper;
+import com.ssafy.tigetting.user.entity.UserEntity;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,10 +34,40 @@ public class PerformanceController {
 
     private final PerformanceService performanceService;
     private final JwtUtil jwtUtil;
+    private final RecommendationService recommendationService;
+    private final UserMapper userMapper;
 
     @GetMapping("/main")
-    public ResponseEntity<List<PerformanceDto>> getAllPerformances() {
-        return ResponseEntity.ok(performanceService.getAllPerformances());
+    public ResponseEntity<PagePerformanceResponse> getAllPerformances(
+            @RequestParam(value = "genreId", required = false) Integer genreId,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+        // JWT 토큰에서 userId 추출
+        Integer userId = extractUserId(authHeader);
+
+        // genreId: null 또는 0 = 홈 (전체 장르), 1=클래식, 2=콘서트, 3=뮤지컬, 4=연극
+        PagePerformanceResponse response = recommendationService.getPagePerformances(genreId, userId);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Authorization 헤더에서 userId 추출
+     */
+    private Integer extractUserId(String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            try {
+                String token = authHeader.replace("Bearer ", "");
+                String email = jwtUtil.extractUsername(token);
+                UserEntity user = userMapper.findByEmail(email).orElse(null);
+                if (user != null) {
+                    return user.getUserId();
+                }
+            } catch (Exception e) {
+                // 토큰 파싱 실패 시 비로그인으로 처리
+            }
+        }
+        return null;
     }
 
     @GetMapping("/{id}")
@@ -75,7 +109,7 @@ public class PerformanceController {
         String token = authHeader.replace("Bearer ", "");
         String email = jwtUtil.extractUsername(token);
         return ResponseEntity.ok(performanceService.createPerformance(
-            email, prfnm, genreName, prfpdfrom, prfpdto, fcltynm, area, mt10id, prfstate, poster));
+                email, prfnm, genreName, prfpdfrom, prfpdto, fcltynm, area, mt10id, prfstate, poster));
     }
 
     @PutMapping("/{id}")
@@ -94,7 +128,7 @@ public class PerformanceController {
         String token = authHeader.replace("Bearer ", "");
         String email = jwtUtil.extractUsername(token);
         return ResponseEntity.ok(performanceService.updatePerformance(
-            email, id, prfnm, genreName, prfpdfrom, prfpdto, fcltynm, area, mt10id, prfstate, poster));
+                email, id, prfnm, genreName, prfpdfrom, prfpdto, fcltynm, area, mt10id, prfstate, poster));
     }
 
     @DeleteMapping("/{id}")
