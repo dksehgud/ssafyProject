@@ -153,14 +153,8 @@ const handleConfirmBooking = () => {
     return
   }
 
-  toast.success(`${selectedSeats.value.length}개의 좌석이 예매되었습니다!`, {
-    description: "예매 내역은 마이페이지에서 확인하실 수 있습니다.",
-  })
-
-  setTimeout(() => {
-    emit('close')
-    selectedSeats.value = []
-  }, 1500)
+  // 부모 컴포넌트로 선택된 좌석 정보 전달
+  emit('confirm', selectedSeats.value)
 }
 
 const totalPrice = computed(() => selectedSeats.value.reduce((acc, seat) => acc + seat.price, 0))

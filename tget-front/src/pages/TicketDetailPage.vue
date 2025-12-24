@@ -52,9 +52,34 @@ const handleReserve = async () => {
   }
 };
 
+import { bookingService } from '@/api/bookingService';
+import { toast } from 'vue-sonner';
+
 const onQueueComplete = () => {
     isQueueModalOpen.value = false;
     isSeatModalOpen.value = true;
+};
+
+const handleSeatConfirmed = async (seats: any[]) => {
+    try {
+        await bookingService.bookTicket({
+            performanceId: ticket.value.performanceId,
+            scheduleId: 1, // TODO: 실제 스케줄 ID 사용
+            seats: seats,
+            token: queueToken.value
+        });
+        
+        toast.success(`${seats.length}개의 좌석이 예매되었습니다!`, {
+            description: "예매 내역은 마이페이지에서 확인하실 수 있습니다.",
+        });
+        
+        isSeatModalOpen.value = false;
+        // 마이페이지의 예약내역 탭으로 이동
+        router.push('/mypage?tab=reservations'); 
+    } catch (error) {
+        console.error("Booking failed:", error);
+        toast.error("예매에 실패했습니다. 다시 시도해주세요.");
+    }
 };
 
 onMounted(async () => {
@@ -393,11 +418,12 @@ const formatDate = (start: string, end: string) => {
     <SeatSelectionModal
       :isOpen="isSeatModalOpen"
       @close="isSeatModalOpen = false"
-      :ticketTitle="ticket.title"
-      :ticketDate="formatDate(ticket.dateStart, ticket.dateEnd)"
-      :ticketLocation="ticket.facilityName"
-      :ticketPrice="ticket.ticketPrice"
-      :ticketCategory="ticket.category"
+      @confirm="handleSeatConfirmed"
+      :ticketTitle="ticket.value?.title || ''"
+      :ticketDate="ticket.value ? formatDate(ticket.value.dateStart, ticket.value.dateEnd) : ''"
+      :ticketLocation="ticket.value?.facilityName || ''"
+      :ticketPrice="ticket.value?.ticketPrice || ''"
+      :ticketCategory="ticket.value?.genre || ''"
     />
   </div>
 </template>

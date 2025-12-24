@@ -3,6 +3,7 @@ package com.ssafy.tigetting.reservation.mapper;
 import java.util.List;
 
 import com.ssafy.tigetting.reservation.entity.ReservationEntity;
+import com.ssafy.tigetting.reservation.entity.ReservationStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -20,7 +21,6 @@ public interface ReservationMapper {
 
     /* 예약 상태 변경 (전체 취소) */
     int updateStatusByGroupId(
-        @Param("groupId") Long groupId,
-        @Param("status") String status
-    );
+            @Param("groupId") Long groupId,
+            @Param("status") ReservationStatus status);
 }

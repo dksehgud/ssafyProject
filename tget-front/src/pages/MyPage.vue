@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
-import { useRouter } from "vue-router"
+import { useRouter, useRoute } from "vue-router"
 import { Ticket, MapPin, Calendar, Clock, X, ChevronRight, User as UserIcon, Eye, EyeOff, Lock, Mail, Phone } from "lucide-vue-next"
 
 import Button from "@/components/ui/Button.vue"
@@ -12,6 +12,7 @@ import DialogHeader from "@/components/ui/DialogHeader.vue"
 import DialogTitle from "@/components/ui/DialogTitle.vue"
 import DialogDescription from "@/components/ui/DialogDescription.vue"
 import { authService } from '@/api/authService'
+import { bookingService } from "@/api/bookingService"
 import { useAuthStore } from '@/stores/auth'
 import { toast } from 'vue-sonner'
 
@@ -27,15 +28,16 @@ interface Reservation {
   reservationDate: string
   seats: string[]
   totalPrice: number
-  status: "confirmed" | "cancelled"
+  status: "CONFIRMED" | "CANCELLED"
   category: string
 }
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
 // 탭 상태
-const activeTab = ref<'profile' | 'reservations'>('profile')
+const activeTab = ref<'profile' | 'reservations'>((route.query.tab as 'profile' | 'reservations') || 'profile')
 
 // 회원정보 관련
 const showCurrentPassword = ref(false)
@@ -53,57 +55,26 @@ const formData = ref({
 })
 
 // 예약내역 관련
-const filter = ref<"all" | "confirmed" | "cancelled">("all")
+const filter = ref<"ALL" | "CONFIRMED" | "CANCELLED">("ALL")
 const selectedReservation = ref<Reservation | null>(null)
 
-/* 샘플 데이터 - TODO: 실제 API 연동 필요 */
-const reservations = ref<Reservation[]>([
-  {
-    reservationId: "R2025001",
-    performanceId: "PF001",
-    performanceTitle: "2025 락 페스티벌",
-    poster: "https://images.unsplash.com/photo-1566735355835-bddb43dc3f63",
-    facilityName: "올림픽공원 체조경기장",
-    area: "서울특별시",
-    performanceDate: "2025-12-15",
-    performanceTime: "19:00",
-    reservationDate: "2024-12-20 14:30",
-    seats: ["A열 12번", "A열 13번"],
-    totalPrice: 198000,
-    status: "confirmed",
-    category: "콘서트",
-  },
-  {
-    reservationId: "R2025003",
-    performanceId: "PF008",
-    performanceTitle: "오페라의 유령",
-    poster: "https://images.unsplash.com/photo-1507676184212-d03ab07a01bf",
-    facilityName: "블루스퀘어",
-    area: "서울특별시",
-    performanceDate: "2024-12-25",
-    performanceTime: "14:00",
-    reservationDate: "2024-12-10 16:45",
-    seats: ["VIP석 3열 15번", "VIP석 3열 16번"],
-    totalPrice: 280000,
-    status: "cancelled",
-    category: "뮤지컬",
-  },
-])
+/* 예약 데이터 */
+const reservations = ref<Reservation[]>([])
 
 /* 필터링 */
 const filteredReservations = computed(() => {
-  if (filter.value === "all") return reservations.value
+  if (filter.value === "ALL") return reservations.value
   return reservations.value.filter(r => r.status === filter.value)
 })
 
 /* 상태 뱃지 */
 const getStatusBadgeClass = (status: string) =>
-  status === "confirmed"
+  status === "CONFIRMED"
     ? "bg-green-600/20 text-green-400 border-green-600/30"
     : "bg-red-600/20 text-red-400 border-red-600/30"
 
 const getStatusLabel = (status: string) =>
-  status === "confirmed" ? "예매완료" : "취소완료"
+  status === "CONFIRMED" ? "예매완료" : "취소완료"
 
 const getCategoryColor = (category: string) => {
   switch (category) {
@@ -121,7 +92,7 @@ const getCategoryColor = (category: string) => {
 }
 
 // 회원정보 관련 로직
-onMounted(() => {
+onMounted(async () => {
   if (!authStore.isAuthenticated) {
     toast.error('로그인이 필요합니다')
     router.push('/login')
@@ -133,6 +104,16 @@ onMounted(() => {
     formData.value.name = userInfo.name || ''
     formData.value.phone = userInfo.phone || ''
     formData.value.email = userInfo.email || ''
+  }
+
+  // 예약 내역 조회
+  try {
+    const data = await bookingService.getMyReservations()
+    console.log("Fetched reservations:", data)
+    reservations.value = data
+  } catch (error) {
+    console.error("Failed to fetch reservations:", error)
+    // toast.error("예약 내역을 불러오는데 실패했습니다.")
   }
 })
 
@@ -227,13 +208,12 @@ const handleCancelReservation = async (reservationId: string) => {
   }
 
   try {
-    // TODO: 실제 API 호출로 교체 필요
-    // await reservationService.cancelReservation(reservationId)
+    await bookingService.cancelReservation(reservationId)
 
-    // 임시로 상태 업데이트
+    // 로컬 상태 업데이트
     const reservation = reservations.value.find(r => r.reservationId === reservationId)
     if (reservation) {
-      reservation.status = 'cancelled'
+      reservation.status = 'CANCELLED'
     }
 
     toast.success('예약이 취소되었습니다')
@@ -490,13 +470,13 @@ const handleCancelReservation = async (reservationId: string) => {
       <!-- 필터 -->
       <div class="flex gap-3 mb-6">
         <button
-          v-for="f in ['all','confirmed','cancelled']"
+          v-for="f in ['ALL','CONFIRMED','CANCELLED']"
           :key="f"
           @click="filter = f as any"
           class="px-5 py-2.5 rounded-full transition-all"
           :class="filter === f ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'"
         >
-          {{ f === 'all' ? '전체' : f === 'confirmed' ? '예매완료' : '취소완료' }}
+          {{ f === 'ALL' ? '전체' : f === 'CONFIRMED' ? '예매완료' : '취소완료' }}
         </button>
       </div>
 
@@ -566,7 +546,7 @@ const handleCancelReservation = async (reservationId: string) => {
                 <p class="text-2xl text-white font-bold">{{ r.totalPrice.toLocaleString() }}원</p>
                 <div class="flex gap-2">
                   <Button
-                    v-if="r.status === 'confirmed'"
+                    v-if="r.status === 'CONFIRMED'"
                     variant="outline"
                     class="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
                     @click="handleCancelReservation(r.reservationId)"
