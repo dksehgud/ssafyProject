@@ -66,11 +66,11 @@ const navigateToDetail = (id: string) => {
 </script>
 
 <template>
-  <div class="relative w-full mb-16">
+  <div v-if="items.length > 0 && currentItem" class="relative w-full mb-16">
     
     <div class="flex items-center gap-4">
       <!-- Left Card + Arrow -->
-      <div class="relative w-[20%]">
+      <div v-if="prevItem" class="relative w-[20%]">
         <button
           @click="handlePrev"
           class="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 flex items-center justify-center transition-all backdrop-blur-sm"
@@ -143,7 +143,7 @@ const navigateToDetail = (id: string) => {
       </div>
 
       <!-- Right Card + Arrow -->
-      <div class="relative w-[20%]">
+      <div v-if="nextItem" class="relative w-[20%]">
         <button
           @click="handleNext"
           class="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 flex items-center justify-center transition-all backdrop-blur-sm"
@@ -167,6 +167,11 @@ const navigateToDetail = (id: string) => {
         </div>
       </div>
     </div>
+  </div>
+  
+  <!-- Empty state when no items -->
+  <div v-else class="relative w-full mb-16 h-[500px] flex items-center justify-center">
+    <p class="text-gray-500 text-lg">공연 정보를 불러오는 중...</p>
   </div>
 </template>
 

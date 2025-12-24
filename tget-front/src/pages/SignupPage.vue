@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
-import { Eye, EyeOff, ArrowLeft, Check } from 'lucide-vue-next'
+import { Eye, EyeOff, ArrowLeft, Check, Send } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Label from '@/components/ui/Label.vue'
@@ -9,6 +9,7 @@ import Checkbox from '@/components/ui/Checkbox.vue'
 import { toast } from 'vue-sonner'
 
 import { useAuthStore } from '@/stores/auth'
+import { authService } from '@/api/authService'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -21,10 +22,19 @@ const formData = ref({
   confirmPassword: "",
   name: "",
   phone: "",
+  verificationCode: "",
 })
 
 const agreedToTerms = ref(false)
 const agreedToPrivacy = ref(false)
+
+// 이메일 인증 관련 상태
+const isEmailVerified = ref(false)
+const isCodeSent = ref(false)
+const isSendingCode = ref(false)
+const isVerifyingCode = ref(false)
+const verificationTimer = ref(0)
+let timerInterval: ReturnType<typeof setInterval> | null = null
 
 const passwordValidation = computed(() => {
   const pwd = formData.value.password
@@ -48,8 +58,103 @@ const isFormValid = computed(() =>
   isPasswordValid.value &&
   formData.value.password === formData.value.confirmPassword &&
   agreedToTerms.value &&
-  agreedToPrivacy.value
+  agreedToPrivacy.value &&
+  isEmailVerified.value  // 이메일 인증 필수
 )
+
+// 타이머 포맷팅 (MM:SS)
+const formattedTimer = computed(() => {
+  const minutes = Math.floor(verificationTimer.value / 60)
+  const seconds = verificationTimer.value % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+})
+
+/**
+ * 인증번호 전송
+ */
+const sendVerificationCode = async () => {
+  if (!formData.value.email) {
+    toast.error('이메일을 입력해주세요')
+    return
+  }
+
+  // 이메일 형식 검증
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(formData.value.email)) {
+    toast.error('올바른 이메일 형식이 아닙니다')
+    return
+  }
+
+  try {
+    isSendingCode.value = true
+    await authService.sendVerificationCode(formData.value.email)
+    
+    isCodeSent.value = true
+    toast.success('인증번호가 전송되었습니다')
+    
+    // 3분 타이머 시작
+    verificationTimer.value = 180
+    if (timerInterval) clearInterval(timerInterval)
+    timerInterval = setInterval(() => {
+      verificationTimer.value--
+      if (verificationTimer.value <= 0) {
+        clearInterval(timerInterval!)
+        isCodeSent.value = false
+        toast.error('인증 시간이 만료되었습니다. 다시 시도해주세요.')
+      }
+    }, 1000)
+  } catch (error: any) {
+    console.error('인증번호 전송 실패:', error)
+    console.log('=== 에러 상세 정보 ===')
+    console.log('상태 코드:', error.response?.status)
+    console.log('응답 데이터:', error.response?.data)
+    console.log('===================')
+    
+    // 백엔드 에러 응답 처리
+    const errorData = error.response?.data
+    let errorMessage = '인증번호 전송에 실패했습니다'
+    
+    // ErrorCode가 AUTH_004 (EMAIL_DUPLICATED)인 경우
+    if (errorData?.code === 'AUTH_004') {
+      errorMessage = '이미 가입된 이메일입니다'
+    } 
+    // 일반적인 메시지가 있는 경우 (두 가지 형식 모두 지원)
+    else if (errorData?.message) {
+      errorMessage = errorData.message
+    }
+    
+    // 한 번만 토스트 표시
+    toast.error(errorMessage)
+  } finally {
+    isSendingCode.value = false
+  }
+}
+
+/**
+ * 인증번호 확인
+ */
+const verifyCode = async () => {
+  if (!formData.value.verificationCode) {
+    toast.error('인증번호를 입력해주세요')
+    return
+  }
+
+  try {
+    isVerifyingCode.value = true
+    await authService.verifyCode(formData.value.email, formData.value.verificationCode)
+    
+    isEmailVerified.value = true
+    isCodeSent.value = false
+    if (timerInterval) clearInterval(timerInterval)
+    
+    toast.success('이메일 인증이 완료되었습니다')
+  } catch (error: any) {
+    console.error('인증번호 확인 실패:', error)
+    toast.error(error.response?.data?.message || '인증번호가 일치하지 않습니다')
+  } finally {
+    isVerifyingCode.value = false
+  }
+}
 
 /**
  * 회원가입 처리 함수
@@ -125,14 +230,59 @@ const handleSubmit = async (e: Event) => {
             <!-- 이메일 -->
             <div class="space-y-2">
               <Label for="email" class="text-gray-300">이메일</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="example@email.com"
-                v-model="formData.email"
-                class="bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-red-600 focus:ring-red-600"
-                required
-              />
+              <div class="flex gap-2">
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="example@email.com"
+                  v-model="formData.email"
+                  :disabled="isEmailVerified"
+                  class="bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-red-600 focus:ring-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  required
+                />
+                <Button
+                  type="button"
+                  @click="sendVerificationCode"
+                  :disabled="isSendingCode || isEmailVerified || !formData.email"
+                  class="bg-red-600 hover:bg-red-700 text-white whitespace-nowrap disabled:bg-gray-700 disabled:cursor-not-allowed"
+                >
+                  <Send class="w-4 h-4 mr-1" />
+                  {{ isEmailVerified ? '인증완료' : '인증번호' }}
+                </Button>
+              </div>
+              <p v-if="isEmailVerified" class="text-xs text-green-500 flex items-center gap-1">
+                <Check class="w-3 h-3" />
+                이메일 인증이 완료되었습니다
+              </p>
+            </div>
+
+            <!-- 인증번호 입력 -->
+            <div v-if="isCodeSent && !isEmailVerified" class="space-y-2">
+              <Label for="verificationCode" class="text-gray-300 flex items-center justify-between">
+                <span>인증번호</span>
+                <span class="text-red-500 text-sm font-mono">{{ formattedTimer }}</span>
+              </Label>
+              <div class="flex gap-2">
+                <Input
+                  id="verificationCode"
+                  type="text"
+                  placeholder="6자리 인증번호"
+                  v-model="formData.verificationCode"
+                  maxlength="6"
+                  class="bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-red-600 focus:ring-red-600"
+                />
+                <Button
+                  type="button"
+                  @click="verifyCode"
+                  :disabled="isVerifyingCode || !formData.verificationCode"
+                  class="bg-green-600 hover:bg-green-700 text-white whitespace-nowrap disabled:bg-gray-700 disabled:cursor-not-allowed"
+                >
+                  확인
+                </Button>
+              </div>
+              <p class="text-xs text-gray-400">
+                이메일로 전송된 6자리 인증번호를 입력해주세요
+              </p>
             </div>
 
             <!-- 비밀번호 -->
