@@ -39,6 +39,9 @@ public class RecommendationService {
     @Value("${recommendation.counts.genre}")
     private int genreCount;
 
+    // 추천 개수 최대 제한 (안전장치)
+    private static final int MAX_RECOMMENDATIONS = 10;
+
     /**
      * 페이지 렌더링용 데이터 조회 (전체 공연 + AI 추천)
      */
@@ -53,27 +56,37 @@ public class RecommendationService {
         if (userId == null) {
             // 비로그인: 기본 추천
             if (genreId == null || genreId == 0) {
-                // 메인 페이지: 각 장르별로 4개씩
+                // 메인 페이지: 각 장르별로 추천
                 recommendations = getRecommendationsByAllGenres(null);
             } else {
-                // 장르 페이지: 해당 장르만 10개
-                recommendations = getBaseRecommendations(genreId, 10);
+                // 장르 페이지: 해당 장르만 (최대 10개)
+                recommendations = getBaseRecommendations(genreId, Math.min(genreCount, MAX_RECOMMENDATIONS));
             }
             recommendationType = "base";
         } else {
             // 로그인: 개인화 추천
             if (genreId == null || genreId == 0) {
-                // 메인 페이지: 각 장르별로 4개씩
+                // 메인 페이지: 각 장르별로 추천
                 recommendations = getPersonalizedRecommendationsByAllGenres(userId);
             } else {
-                // 장르 페이지: 해당 장르만 10개
-                recommendations = getPersonalizedRecommendations(genreId, userId, 10);
+                // 장르 페이지: 해당 장르만 (최대 10개)
+                recommendations = getPersonalizedRecommendations(genreId, userId, Math.min(genreCount, MAX_RECOMMENDATIONS));
             }
             recommendationType = "personalized";
         }
 
+        // 추천이 비어있으면 경고
+        if (recommendations.isEmpty()) {
+            log.warn("⚠️⚠️⚠️ 추천 공연이 0개입니다! AI 배치 작업을 실행하세요: POST /api/recommendations/batch");
+        }
+
         // 2. 전체 공연 리스트 조회 (추천에 포함된 공연 제외)
         List<PerformanceDto> allPerformances = getAllPerformancesByGenreExcluding(genreId, recommendations);
+
+        // 전체 공연도 비어있으면 심각한 문제
+        if (allPerformances.isEmpty() && recommendations.isEmpty()) {
+            log.error("🚨 데이터베이스에 공연 데이터가 전혀 없습니다! performances 테이블을 확인하세요.");
+        }
 
         return new com.ssafy.tigetting.recommendation.dto.PagePerformanceResponse(
                 allPerformances,
@@ -128,11 +141,15 @@ public class RecommendationService {
 
         if (userId == null) {
             // 비로그인: DB에서 기본 추천만 조회
-            int limit = (genreId == null || genreId == 0) ? 15 : 10; // 메인 페이지는 15개, 장르 페이지는 10개
+            int limit = (genreId == null || genreId == 0)
+                ? Math.min(homeCount, MAX_RECOMMENDATIONS)
+                : Math.min(genreCount, MAX_RECOMMENDATIONS);
             return getBaseRecommendations(genreId, limit);
         } else {
             // 로그인: 개인화 추천
-            int limit = (genreId == null || genreId == 0) ? 15 : 10; // 메인 페이지는 15개, 장르 페이지는 10개
+            int limit = (genreId == null || genreId == 0)
+                ? Math.min(homeCount, MAX_RECOMMENDATIONS)
+                : Math.min(genreCount, MAX_RECOMMENDATIONS);
             return getPersonalizedRecommendations(genreId, userId, limit);
         }
     }
@@ -163,12 +180,14 @@ public class RecommendationService {
         log.info("🎨 장르별 추천 조회 시작 - genreId: {}", genreId);
         List<PerformanceDto> result = new ArrayList<>();
         
-        // 메인 페이지: 각 장르별로 4개씩
+        // 메인 페이지: 각 장르별로 균등 분배 (최대 10개를 4개 장르로 나눔)
         if (genreId == null || genreId == 0) {
             Integer[] genres = {1, 2, 3, 4}; // 클래식, 콘서트, 뮤지컬, 연극
+            int perGenre = Math.min(homeCount / genres.length, MAX_RECOMMENDATIONS / genres.length);
+
             for (Integer genre : genres) {
                 log.info("  🔍 장르 {} 추천 조회 중...", genre);
-                List<String> genreIds = aiRecommendationMapper.findIdsByGenreId(genre, 4);
+                List<String> genreIds = aiRecommendationMapper.findIdsByGenreId(genre, perGenre);
                 log.info("  📊 장르 {} AI 추천 결과: {} 개", genre, genreIds != null ? genreIds.size() : "null");
                 
                 if (genreIds != null && !genreIds.isEmpty()) {
@@ -189,23 +208,43 @@ public class RecommendationService {
                     log.info("  📊 장르 {} 최신 공연 결과: {} 개", genre, genrePerfs != null ? genrePerfs.size() : "null");
                     
                     if (genrePerfs != null && !genrePerfs.isEmpty()) {
-                        int limit = Math.min(4, genrePerfs.size());
+                        int limit = Math.min(perGenre, genrePerfs.size());
                         result.addAll(genrePerfs.subList(0, limit));
                         log.info("  ✅ 장르 {} 최신 공연 {} 개 추가", genre, limit);
                     }
                 }
+
+                // 그래도 없으면 전체 공연에서 가져오기
+                if (result.isEmpty()) {
+                    log.warn("⚠️ 장르별 공연도 없습니다. 전체 공연에서 조회합니다.");
+                    List<PerformanceDto> allPerfs = performanceMapper.findAll();
+                    if (allPerfs != null && !allPerfs.isEmpty()) {
+                        int limit = Math.min(MAX_RECOMMENDATIONS, allPerfs.size());
+                        result.addAll(allPerfs.subList(0, limit));
+                        log.info("  ✅ 전체 공연에서 {} 개 추가", limit);
+                    }
+                }
             }
         } 
-        // 특정 장르 페이지: 해당 장르만
+        // 특정 장르 페이지: 해당 장르만 (최대 10개)
         else {
             log.info("  🔍 특정 장르 {} 최신 공연 조회 중...", genreId);
             List<PerformanceDto> genrePerfs = performanceMapper.findByVenueIdAndFilters(null, genreId, null);
             log.info("  📊 장르 {} 최신 공연 결과: {} 개", genreId, genrePerfs != null ? genrePerfs.size() : "null");
             
             if (genrePerfs != null && !genrePerfs.isEmpty()) {
-                int limit = Math.min(10, genrePerfs.size());
+                int limit = Math.min(Math.min(genreCount, MAX_RECOMMENDATIONS), genrePerfs.size());
                 result.addAll(genrePerfs.subList(0, limit));
                 log.info("  ✅ 장르 {} 최신 공연 {} 개 추가", genreId, limit);
+            } else {
+                // 해당 장르에 공연이 없으면 전체 공연에서 가져오기
+                log.warn("⚠️ 장르 {} 공연이 없습니다. 전체 공연에서 조회합니다.", genreId);
+                List<PerformanceDto> allPerfs = performanceMapper.findAll();
+                if (allPerfs != null && !allPerfs.isEmpty()) {
+                    int limit = Math.min(MAX_RECOMMENDATIONS, allPerfs.size());
+                    result.addAll(allPerfs.subList(0, limit));
+                    log.info("  ✅ 전체 공연에서 {} 개 추가", limit);
+                }
             }
         }
         
@@ -214,14 +253,15 @@ public class RecommendationService {
     }
     
     /**
-     * 개인화 추천 - 메인 페이지용 (각 장르별 4개씩)
+     * 개인화 추천 - 메인 페이지용 (각 장르별로 균등 분배)
      */
     private List<PerformanceDto> getPersonalizedRecommendationsByAllGenres(Integer userId) {
         log.info("🎯 개인화 추천 조회 (메인 페이지) - userId: {}", userId);
         
         List<PerformanceDto> result = new ArrayList<>();
         Integer[] genres = {1, 2, 3, 4}; // 클래식, 콘서트, 뮤지컬, 연극
-        
+        int perGenre = Math.min(homeCount / genres.length, MAX_RECOMMENDATIONS / genres.length);
+
         // 사용자 예매 이력 조회
         List<UserBookingHistory> userHistory = bookingMapper.selectUserBookingHistory(userId);
         
@@ -239,7 +279,7 @@ public class RecommendationService {
                 List<String> personalizedIds = claudeAIService.personalizeRecommendations(
                         baseRecommendationIds,
                         userHistory,
-                        4);
+                        perGenre);
                 if (personalizedIds != null && !personalizedIds.isEmpty()) {
                     List<PerformanceDto> performances = performanceMapper.selectByIds(personalizedIds);
                     if (performances != null && !performances.isEmpty()) {
@@ -248,7 +288,7 @@ public class RecommendationService {
                 }
             } else {
                 // 저장된 추천이 없으면 기본 추천
-                List<String> genreIds = aiRecommendationMapper.findIdsByGenreId(genre, 4);
+                List<String> genreIds = aiRecommendationMapper.findIdsByGenreId(genre, perGenre);
                 if (genreIds != null && !genreIds.isEmpty()) {
                     List<PerformanceDto> performances = performanceMapper.selectByIds(genreIds);
                     if (performances != null && !performances.isEmpty()) {
@@ -326,14 +366,23 @@ public class RecommendationService {
     public void generateBaseRecommendationsForPage(Integer genreId, List<PerformanceForAI> allPerformances) {
         log.info("🎬 장르 {} 기본 추천 생성 시작", genreId);
 
-        // 추천 개수 결정
-        int count = (genreId == null || genreId == 0) ? homeCount : genreCount;
+        // 추천 개수 결정 (최대 10개 제한)
+        int count = (genreId == null || genreId == 0)
+            ? Math.min(homeCount, MAX_RECOMMENDATIONS)
+            : Math.min(genreCount, MAX_RECOMMENDATIONS);
 
         // AI 추천 생성
         List<String> recommendedIds = claudeAIService.generateBaseRecommendations(
                 allPerformances,
                 genreId,
                 count);
+
+        // 최대 개수 제한 재확인 (안전장치)
+        if (recommendedIds.size() > MAX_RECOMMENDATIONS) {
+            log.warn("⚠️ AI가 {} 개를 반환했습니다. {} 개로 제한합니다.",
+                recommendedIds.size(), MAX_RECOMMENDATIONS);
+            recommendedIds = recommendedIds.subList(0, MAX_RECOMMENDATIONS);
+        }
 
         // 기존 추천 삭제
         aiRecommendationMapper.deleteByGenreId(genreId);
@@ -355,5 +404,12 @@ public class RecommendationService {
             aiRecommendationMapper.saveAll(recommendations);
             log.info("✅ 장르 {} 추천 {} 개 저장 완료", genreId, recommendations.size());
         }
+    }
+
+    /**
+     * 전체 활성 공연 조회 (테스트용 public 메서드)
+     */
+    public List<PerformanceForAI> getAllActivePerformances() {
+        return performanceMapper.selectAllActivePerformances();
     }
 }

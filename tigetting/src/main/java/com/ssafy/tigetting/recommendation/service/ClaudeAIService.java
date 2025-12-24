@@ -105,17 +105,34 @@ public class ClaudeAIService {
         String genreDescription = getGenreDescription(genreId);
         String criteria = getRecommendationCriteria(genreId);
 
-        StringBuilder performancesJson = new StringBuilder();
-        for (PerformanceForAI perf : performances) {
-            performancesJson.append(String.format(
-                    "{\"mt20id\":\"%s\",\"prfnm\":\"%s\",\"genreid\":%d,\"prfstate\":\"%s\",\"area\":\"%s\",\"fcltynm\":\"%s\",\"prfcast\":\"%s\"},",
+        // 요청 크기 제한: 홈페이지(전체)는 200개, 장르별은 50개
+        int maxPerformances = (genreId == null || genreId == 0) ? 200 : 50;
+        List<PerformanceForAI> limitedPerformances = performances.size() > maxPerformances
+                ? performances.subList(0, maxPerformances)
+                : performances;
+
+        log.info("📊 AI 요청에 포함할 공연 수: {} / {} (최대: {})",
+            limitedPerformances.size(), performances.size(), maxPerformances);
+
+        // 더 간결한 포맷으로 변경: [ID, 제목축약, 장르ID, 상태]
+        StringBuilder performancesList = new StringBuilder();
+        for (PerformanceForAI perf : limitedPerformances) {
+            // 제목만 20자로 축약 (가장 중요한 정보)
+            String prfnm = perf.getPrfnm() != null && perf.getPrfnm().length() > 20
+                    ? perf.getPrfnm().substring(0, 20)
+                    : perf.getPrfnm();
+
+            performancesList.append(String.format(
+                    "[\"%s\",\"%s\",%d,\"%s\"],",
                     perf.getMt20id(),
-                    perf.getPrfnm(),
+                    prfnm,
                     perf.getGenreid(),
-                    perf.getPrfstate(),
-                    perf.getArea(),
-                    perf.getFcltynm(),
-                    perf.getPrfcast() != null ? perf.getPrfcast() : ""));
+                    perf.getPrfstate()));
+        }
+
+        // 마지막 쉼표 제거
+        if (performancesList.length() > 0) {
+            performancesList.setLength(performancesList.length() - 1);
         }
 
         return String.format("""
@@ -124,16 +141,16 @@ public class ClaudeAIService {
                 추천 기준:
                 %s
 
-                공연 목록:
+                공연 목록 (각 항목: [ID, 제목, 장르ID, 상태]):
                 [%s]
 
-                응답은 반드시 다음 JSON 형식으로만 작성해주세요. 다른 설명은 포함하지 마세요:
-                {"recommendations": ["mt20id1", "mt20id2", "mt20id3", ...]}
+                응답은 반드시 다음 JSON 형식으로만 작성:
+                {"recommendations": ["id1", "id2", ...]}
                 """,
                 genreDescription,
                 count,
                 criteria,
-                performancesJson.toString());
+                performancesList);
     }
 
     /**
@@ -144,13 +161,27 @@ public class ClaudeAIService {
             List<UserBookingHistory> userHistory,
             int count) {
 
+        // 사용자 이력이 너무 많으면 최근 20개만 사용
+        int maxHistory = 20;
+        List<UserBookingHistory> limitedHistory = userHistory.size() > maxHistory
+                ? userHistory.subList(0, maxHistory)
+                : userHistory;
+
         StringBuilder historyText = new StringBuilder();
         Map<Integer, Long> genreCount = new HashMap<>();
 
-        for (UserBookingHistory history : userHistory) {
-            historyText.append(String.format("- %s (%s, 장르ID: %d)\\n",
-                    history.getPrfnm(),
-                    history.getArea(),
+        for (UserBookingHistory history : limitedHistory) {
+            // 공연 이름 길이 제한
+            String prfnm = history.getPrfnm() != null && history.getPrfnm().length() > 30
+                    ? history.getPrfnm().substring(0, 30)
+                    : history.getPrfnm();
+            String area = history.getArea() != null && history.getArea().length() > 15
+                    ? history.getArea().substring(0, 15)
+                    : history.getArea();
+
+            historyText.append(String.format("- %s (%s, G%d)\\n",
+                    prfnm,
+                    area,
                     history.getGenreid()));
             genreCount.put(history.getGenreid(),
                     genreCount.getOrDefault(history.getGenreid(), 0L) + 1);
@@ -159,25 +190,26 @@ public class ClaudeAIService {
         String preferredGenres = genreCount.entrySet().stream()
                 .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed())
                 .limit(2)
-                .map(e -> "장르ID " + e.getKey())
+                .map(e -> "G" + e.getKey())
                 .reduce((a, b) -> a + ", " + b)
                 .orElse("없음");
 
         return String.format("""
-                다음 추천 후보 목록에서 사용자의 예매 이력을 고려하여 %d개를 선정해주세요.
+                다음 추천 후보에서 사용자 예매 이력을 고려하여 %d개를 선정해주세요.
 
-                사용자 예매 이력:
+                사용자 최근 예매 (최대 %d건):
                 %s
 
                 선호 장르: %s
 
-                추천 후보 ID 목록:
+                추천 후보 ID:
                 %s
 
-                응답은 반드시 다음 JSON 형식으로만 작성해주세요:
-                {"recommendations": ["mt20id1", "mt20id2", ...]}
+                응답은 반드시 다음 JSON 형식으로만 작성:
+                {"recommendations": ["id1", "id2", ...]}
                 """,
                 count,
+                limitedHistory.size(),
                 historyText.toString(),
                 preferredGenres,
                 baseIds);
@@ -187,6 +219,14 @@ public class ClaudeAIService {
      * Claude API 호출
      */
     private String callClaudeAPI(String prompt) throws JsonProcessingException {
+        // 프롬프트 크기 로깅 (디버깅용)
+        int promptSize = prompt.getBytes().length;
+        log.info("📏 프롬프트 크기: {} bytes (~{} KB)", promptSize, promptSize / 1024);
+
+        if (promptSize > 100000) { // 100KB 이상이면 경고
+            log.warn("⚠️ 프롬프트 크기가 큽니다. 413 에러 발생 가능성 있음");
+        }
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("x-api-key", apiKey);
