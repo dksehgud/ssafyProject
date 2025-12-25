@@ -287,13 +287,6 @@ const handleVenueClick = async (venue: VenueInfo) => {
     console.error("[MapModal] 공연장 상세정보 로드 실패:", error);
     // 실패 시 기존 데이터로 표시
     selectedVenue.value = venue;
-
-    // 실패해도 지도는 중앙으로 이동 (이미 위에서 이동했지만 재확인)
-    if (map.value && venue.latitude && venue.longitude) {
-      const pos = new window.kakao.maps.LatLng(venue.latitude, venue.longitude);
-      map.value.setCenter(pos);
-      map.value.setLevel(4);
-    }
   }
 };
 
@@ -461,7 +454,7 @@ const updateMarkers = () => {
       const overlayContent = document.createElement('div');
       overlayContent.className = 'custom-overlay';
       overlayContent.style.cssText = `
-        padding: 6px 11px;
+        padding: 6px 5px;
         background: rgba(239, 68, 68, 0.95);
         color: white;
         font-size: 12px;
@@ -480,7 +473,7 @@ const updateMarkers = () => {
         position: pos,
         content: overlayContent,
         xAnchor: 0.5, // 가로 중앙
-        yAnchor: 2.5, // 마커 위쪽에 표시 (더 높게, 마커와 겹치지 않게)
+        yAnchor: 2.2, // 마커 위쪽에 표시 (마커와 적당한 거리)
         zIndex: 100,
       });
 
@@ -519,7 +512,7 @@ const updateMarkers = () => {
           position: pos,
           content: hoverContent,
           xAnchor: 0.5, // 가로 중앙
-          yAnchor: 2.5, // 마커 위쪽에 표시 (더 높게)
+          yAnchor: 2.5, // 마커 위쪽에 표시 (적당한 높이)
           map: map.value,
           zIndex: 10000, // 호버 시 더 위에 표시
         });
@@ -707,16 +700,7 @@ watch(
   { flush: "post" }
 ); // DOM 업데이트 후 실행
 
-// selectedVenue 변경 시 지도 중심 이동 및 확대
-watch(selectedVenue, (venue) => {
-  if (!venue || !map.value) return;
-  if (!venue.latitude || !venue.longitude) return;
-
-  const pos = new window.kakao.maps.LatLng(venue.latitude, venue.longitude);
-  map.value.setCenter(pos); // 정확히 중앙으로 이동
-  map.value.setLevel(4); // 라벨이 보이도록 줌 레벨 4로 확대
-  console.log("[MapModal] selectedVenue watch - 지도를 중앙으로 이동 및 확대, 줌 레벨: 4");
-});
+// selectedVenue 변경 시 더 이상 지도 중심 이동하지 않음 (길찾기 버튼 클릭 시에만 이동)
 </script>
 
 <template>

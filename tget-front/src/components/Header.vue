@@ -6,7 +6,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
 import { ChevronDown, LogOut, User, Shield } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import Button from './ui/Button.vue'
@@ -27,10 +27,18 @@ const authStore = useAuthStore()
 
 const isHomePage = computed(() => route.path === '/')
 const isMyPage = computed(() => route.path === '/mypage')
+const isAdminPage = computed(() => route.path === '/admin')
 const isTicketDetailPage = computed(() => route.path.startsWith('/ticket/'))
-const showNavigation = computed(() => isHomePage.value || isMyPage.value || isTicketDetailPage.value)
+const showNavigation = computed(() => isHomePage.value || (!isMyPage.value && !isAdminPage.value && !isTicketDetailPage.value))
 const isDropdownOpen = ref(false)
 const isMobileMenuOpen = ref(false)
+
+// 마이페이지나 관리자페이지에 진입할 때 카테고리 선택 해제
+watch([isMyPage, isAdminPage], ([myPage, adminPage]) => {
+  if (myPage || adminPage) {
+    emit('categorySelect', null)
+  }
+})
 
 // 선택된 카테고리 (props 사용)
 const currentCategory = computed(() => props.selectedCategory)
@@ -184,14 +192,23 @@ const handleLogout = async () => {
       <div class="flex items-center gap-2 sm:gap-3">
         <!-- 로그인 상태: 사용자 드롭다운 메뉴 -->
         <template v-if="isAuthenticated">
-          <!-- 관리자 모드 버튼 (ADMIN 권한만) -->
+          <!-- 관리자 모드 / 회원 모드 버튼 (ADMIN 권한만) -->
           <button
-            v-if="isAdmin"
+            v-if="isAdmin && !isAdminPage"
             @click="goToAdminPage"
             class="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
           >
             <Shield class="h-4 w-4" />
             <span class="hidden sm:inline">관리자 모드</span>
+          </button>
+
+          <button
+            v-if="isAdmin && isAdminPage"
+            @click="router.push('/')"
+            class="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+          >
+            <User class="h-4 w-4" />
+            <span class="hidden sm:inline">회원 모드</span>
           </button>
 
           <div class="relative">

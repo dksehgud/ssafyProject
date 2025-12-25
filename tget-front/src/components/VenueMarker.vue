@@ -8,37 +8,37 @@
       <svg
         width="32"
         height="32"
-        viewBox="0 0 32 38"
+        viewBox="0 0 32 32"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         class="marker-svg"
       >
         <!-- 외곽 테두리 -->
         <path
-          d="M16 2L28 10V26L16 36L4 26V10L16 2Z"
+          d="M16 2L28 10V22L16 30L4 22V10L16 2Z"
           fill="#dc2626"
           stroke="#991b1b"
           stroke-width="1.5"
         />
 
         <!-- 내부 티켓 아이콘 -->
-        <rect x="11" y="13" width="10" height="7" rx="0.8" fill="white" opacity="0.9" />
+        <rect x="11" y="11" width="10" height="7" rx="0.8" fill="white" opacity="0.9" />
         <line
           x1="11"
-          y1="16.5"
+          y1="14.5"
           x2="21"
-          y2="16.5"
+          y2="14.5"
           stroke="#dc2626"
           stroke-width="0.4"
           stroke-dasharray="0.8 0.8"
         />
-        <rect x="12.5" y="14.5" width="2" height="1.2" fill="#dc2626" opacity="0.7" />
-        <rect x="12.5" y="18" width="5" height="0.8" fill="#dc2626" opacity="0.5" />
+        <rect x="12.5" y="12.5" width="2" height="1.2" fill="#dc2626" opacity="0.7" />
+        <rect x="12.5" y="16" width="5" height="0.8" fill="#dc2626" opacity="0.5" />
 
         <!-- 펄스 효과 -->
-        <circle cx="16" cy="19" r="20" fill="#dc2626" opacity="0.12">
-          <animate attributeName="r" from="10" to="28" dur="2s" repeatCount="indefinite" />
-          <animate attributeName="opacity" from="0.36" to="0" dur="2s" repeatCount="indefinite" />
+        <circle cx="16" cy="16" r="20" fill="#dc2626" opacity="0.18">
+          <animate attributeName="r" from="12" to="32" dur="2s" repeatCount="indefinite" />
+          <animate attributeName="opacity" from="0.45" to="0" dur="2s" repeatCount="indefinite" />
         </circle>
       </svg>
 
@@ -90,7 +90,7 @@ onMounted(() => {
 .marker-wrapper {
   position: relative;
   width: 32px;
-  height: 32px;
+  height: 38px;
   pointer-events: none; /* 마커 자체는 마우스 이벤트 무시 */
 }
 
