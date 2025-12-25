@@ -1,3 +1,20 @@
+<script setup lang="ts">
+import { generateStandardSeats } from '@/utils/seatDataGenerator'
+
+interface Seat {
+  id: string
+  section: string
+  row: number
+  number: number
+  x: number
+  y: number
+  price: number
+  isBooked: boolean
+}
+
+const seats: Seat[] = generateStandardSeats()
+</script>
+
 <template>
   <svg viewBox="0 0 1000 700" class="w-full h-auto">
     <!-- 배경 -->
@@ -9,66 +26,33 @@
       무대 (STAGE)
     </text>
 
-    <!-- 1구역 (왼쪽) - 10x5 = 50개 -->
-    <g id="section1">
-      <text x="200" y="140" fill="#999" font-size="16" font-weight="bold">1구역</text>
-      <template v-for="row in 10" :key="`1-row-${row}`">
-        <template v-for="col in 5" :key="`1-${row}-${col}`">
-          <rect
-            :x="140 + (col - 1) * 35"
-            :y="160 + (row - 1) * 35"
-            width="28"
-            height="28"
-            fill="#333"
-            stroke="#666"
-            stroke-width="1"
-            rx="3"
-          />
-        </template>
-      </template>
-    </g>
+    <!-- 구역 레이블 -->
+    <text x="144" y="140" fill="#999" font-size="16" font-weight="bold" text-anchor="middle">1구역</text>
+    <text x="379" y="140" fill="#999" font-size="16" font-weight="bold" text-anchor="middle">2구역</text>
+    <text x="614" y="140" fill="#999" font-size="16" font-weight="bold" text-anchor="middle">3구역</text>
+    <text x="849" y="140" fill="#999" font-size="16" font-weight="bold" text-anchor="middle">4구역</text>
 
-    <!-- 2구역 (중앙) - 10x5 = 50개 -->
-    <g id="section2">
-      <text x="480" y="140" fill="#999" font-size="16" font-weight="bold">2구역</text>
-      <template v-for="row in 10" :key="`2-row-${row}`">
-        <template v-for="col in 5" :key="`2-${row}-${col}`">
-          <rect
-            :x="420 + (col - 1) * 35"
-            :y="160 + (row - 1) * 35"
-            width="28"
-            height="28"
-            fill="#333"
-            stroke="#666"
-            stroke-width="1"
-            rx="3"
-          />
-        </template>
-      </template>
-    </g>
-
-    <!-- 3구역 (오른쪽) - 10x5 = 50개 -->
-    <g id="section3">
-      <text x="760" y="140" fill="#999" font-size="16" font-weight="bold">3구역</text>
-      <template v-for="row in 10" :key="`3-row-${row}`">
-        <template v-for="col in 5" :key="`3-${row}-${col}`">
-          <rect
-            :x="700 + (col - 1) * 35"
-            :y="160 + (row - 1) * 35"
-            width="28"
-            height="28"
-            fill="#333"
-            stroke="#666"
-            stroke-width="1"
-            rx="3"
-          />
-        </template>
-      </template>
+    <!-- 좌석 렌더링 -->
+    <g id="seats">
+      <rect
+        v-for="seat in seats"
+        :key="seat.id"
+        :x="seat.x - 14"
+        :y="seat.y - 14"
+        width="28"
+        height="28"
+        fill="#333"
+        stroke="#666"
+        stroke-width="1"
+        rx="3"
+      >
+        <title>{{ seat.section }} {{ seat.row }}열 {{ seat.number }}번</title>
+      </rect>
     </g>
 
     <!-- 하단 안내 -->
     <text x="500" y="680" text-anchor="middle" fill="#666" font-size="14">
-      총 좌석: 150석
+      총 좌석: {{ seats.length }}석
     </text>
   </svg>
 </template>

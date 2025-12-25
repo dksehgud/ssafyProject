@@ -2,83 +2,31 @@
 export function generateStandardSeats() {
     const seats = [];
 
-    // 1구역 (왼쪽) - 5x8 = 40개
-    for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 5; col++) {
-            seats.push({
-                id: `1-${row + 1}-${col + 1}`,
-                section: '1구역',
-                row: row + 1,
-                number: col + 1,
-                x: 94 + col * 35,
-                y: 174 + row * 35,
-                price: 80000,
-                isBooked: false,
-            });
-        }
-    }
+    // 4 sections, each 5 cols x 8 rows
+    // Spacing calculation:
+    // Total Width: 1000
+    // Section Width: ~175 (5 * 35)
+    // Gap: ~60 ((1000 - 4*175) / 5)
 
-    // 2구역 (중앙 왼쪽) - 6x10 = 60개
-    for (let row = 0; row < 10; row++) {
-        for (let col = 0; col < 6; col++) {
-            seats.push({
-                id: `2-${row + 1}-${col + 1}`,
-                section: '2구역',
-                row: row + 1,
-                number: col + 1,
-                x: 294 + col * 35,
-                y: 174 + row * 35,
-                price: 100000,
-                isBooked: false,
-            });
-        }
-    }
+    const startXPositions = [60, 295, 530, 765];
+    const sectionNames = ["1구역", "2구역", "3구역", "4구역"];
+    const sectionPrices = [80000, 100000, 100000, 80000];
+    const rowCounts = [8, 10, 10, 8];
 
-    // 3구역 VIP (중앙) - 6x10 = 60개
-    for (let row = 0; row < 10; row++) {
-        for (let col = 0; col < 6; col++) {
-            seats.push({
-                id: `3-${row + 1}-${col + 1}`,
-                section: '3구역(VIP)',
-                row: row + 1,
-                number: col + 1,
-                x: 534 + col * 35,
-                y: 174 + row * 35,
-                price: 150000,
-                isBooked: false,
-            });
-        }
-    }
-
-    // 4구역 (중앙 오른쪽) - 6x10 = 60개
-    for (let row = 0; row < 10; row++) {
-        for (let col = 0; col < 6; col++) {
-            seats.push({
-                id: `4-${row + 1}-${col + 1}`,
-                section: '4구역',
-                row: row + 1,
-                number: col + 1,
-                x: 754 + col * 35,
-                y: 174 + row * 35,
-                price: 100000,
-                isBooked: false,
-            });
-        }
-    }
-
-    // 5구역 (오른쪽) - 5x8 = 40개
-    for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 5; col++) {
-            seats.push({
-                id: `5-${row + 1}-${col + 1}`,
-                section: '5구역',
-                row: row + 1,
-                number: col + 1,
-                x: 94 + col * 35,
-                y: 564 + row * 35,
-                price: 80000,
-                isBooked: false,
-            });
+    for (let s = 0; s < 4; s++) {
+        for (let row = 0; row < rowCounts[s]; row++) {
+            for (let col = 0; col < 5; col++) {
+                seats.push({
+                    id: `${s + 1}-${row + 1}-${col + 1}`,
+                    section: sectionNames[s],
+                    row: row + 1,
+                    number: col + 1,
+                    x: startXPositions[s] + col * 35,
+                    y: 174 + row * 35,
+                    price: sectionPrices[s],
+                    isBooked: false,
+                });
+            }
         }
     }
 

@@ -419,11 +419,11 @@ const formatDate = (start: string, end: string) => {
       :isOpen="isSeatModalOpen"
       @close="isSeatModalOpen = false"
       @confirm="handleSeatConfirmed"
-      :ticketTitle="ticket.value?.title || ''"
-      :ticketDate="ticket.value ? formatDate(ticket.value.dateStart, ticket.value.dateEnd) : ''"
-      :ticketLocation="ticket.value?.facilityName || ''"
-      :ticketPrice="ticket.value?.ticketPrice || ''"
-      :ticketCategory="ticket.value?.genre || ''"
+      :ticketTitle="ticket?.title || ''"
+      :ticketDate="ticket ? formatDate(ticket.dateStart, ticket.dateEnd) : ''"
+      :ticketLocation="ticket?.facilityName || ''"
+      :ticketPrice="ticket?.ticketPrice || ''"
+      :ticketCategory="ticket?.genre || ''"
     />
   </div>
 </template>
