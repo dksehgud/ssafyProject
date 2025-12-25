@@ -54,5 +54,15 @@ export const queueService = {
             scheduleId
         })
         return response.data
+    },
+
+    /**
+     * 대기열/세션 만료 (사용자 이탈)
+     */
+    async expireToken(token) {
+        const response = await axios.post(`${QUEUE_URL}/expire`, {
+            token
+        })
+        return response.data
     }
 }

@@ -16,9 +16,9 @@ const seats: Seat[] = generateFanSeats()
 </script>
 
 <template>
-  <svg viewBox="0 0 1000 850" class="w-full h-auto">
+  <svg viewBox="-300 0 1600 1000" class="w-full h-auto">
     <!-- 배경 -->
-    <rect width="1000" height="850" fill="#1a1a1a" />
+    <rect x="-300" y="0" width="1600" height="1000" fill="#1a1a1a" />
 
     <!-- 무대 -->
     <rect x="350" y="30" width="300" height="60" fill="#dc2626" rx="5" />
@@ -46,7 +46,7 @@ const seats: Seat[] = generateFanSeats()
     </g>
 
     <!-- 하단 안내 -->
-    <text x="500" y="830" text-anchor="middle" fill="#666" font-size="14">
+    <text x="500" y="980" text-anchor="middle" fill="#666" font-size="14">
       총 좌석: {{ seats.length }}석
     </text>
   </svg>

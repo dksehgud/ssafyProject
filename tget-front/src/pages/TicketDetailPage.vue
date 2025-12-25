@@ -60,6 +60,18 @@ const onQueueComplete = () => {
     isSeatModalOpen.value = true;
 };
 
+const handleQueueClose = async () => {
+    if (queueToken.value) {
+        try {
+            await queueService.expireToken(queueToken.value);
+            console.log("Waiting queue cancelled and token expired:", queueToken.value);
+        } catch (e) {
+            console.warn("Failed to expire waiting token:", e);
+        }
+    }
+    isQueueModalOpen.value = false;
+};
+
 const handleSeatConfirmed = async (seats: any[]) => {
     try {
         await bookingService.bookTicket({
@@ -410,7 +422,7 @@ const formatDate = (start: string, end: string) => {
         :performanceId="ticket.performanceId"
         :initialWaitingCount="initialQueueData.waiting"
         :initialEstimatedTime="initialQueueData.estimatedTime"
-        @close="isQueueModalOpen = false"
+        @close="handleQueueClose"
         @complete="onQueueComplete"
     />
 
@@ -424,6 +436,8 @@ const formatDate = (start: string, end: string) => {
       :ticketLocation="ticket?.facilityName || ''"
       :ticketPrice="ticket?.ticketPrice || ''"
       :ticketCategory="ticket?.genre || ''"
+      :performanceId="ticket?.performanceId || ''"
+      :queueToken="queueToken"
     />
   </div>
 </template>

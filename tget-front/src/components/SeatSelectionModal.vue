@@ -4,12 +4,18 @@ import { X, Check, MapPin } from 'lucide-vue-next'
 import Button from './ui/Button.vue'
 import Separator from './ui/Separator.vue'
 import { toast } from 'vue-sonner'
-import { format } from 'date-fns'
-import { ko } from 'date-fns/locale'
+
 import SeatMapStandard from './SeatMapStandard.vue'
 import SeatMapFan from './SeatMapFan.vue'
 import SeatMapTheater from './SeatMapTheater.vue'
-import { generateStandardSeats, generateFanSeats, generateTheaterSeats, type Seat } from '@/utils/seatDataGenerator'
+import { generateStandardSeats, generateFanSeats, generateTheaterSeats } from '@/utils/seatDataGenerator'
+import axios from 'axios' // Import Axios
+
+interface OccupiedSeat {
+  section: string
+  row: string
+  number: string
+}
 
 interface Props {
   isOpen: boolean
@@ -18,54 +24,60 @@ interface Props {
   ticketLocation: string
   ticketPrice: string
   ticketCategory: string
+  performanceId: string // Add performanceId prop
+  queueToken: string // Add queueToken prop
+}
+
+interface Seat {
+  id: string
+  section: string
+  row: number
+  number: number
+  x: number
+  y: number
+  price: number
+  isBooked: boolean
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'confirm', seats: Seat[]): void
 }>()
 
 const selectedSeats = ref<Seat[]>([])
 const selectedDate = ref<Date>(new Date())
 const allSeats = ref<Seat[]>([])
+const isProcessing = ref(false)
 
-// 날짜별 예매 상태를 시뮬레이션
-const getBookedSeatsForDate = (date: Date, seatType: string): string[] => {
-  const dateKey = format(date, "yyyy-MM-dd")
-  const today = format(new Date(), "yyyy-MM-dd")
-  const tomorrow = format(new Date(Date.now() + 86400000), "yyyy-MM-dd")
-  const dayAfter = format(new Date(Date.now() + 172800000), "yyyy-MM-dd")
-
-  const bookedSeatsData: Record<string, Record<string, string[]>> = {
-    standard: {
-      [today]: ["1-1-1", "1-2-2", "2-3-3", "3-5-5", "3-6-6", "4-4-4", "5-1-1"],
-      [tomorrow]: ["1-1-2", "2-1-1", "3-1-1", "3-2-2", "4-1-1", "5-2-2"],
-      [dayAfter]: ["1-3-1", "2-4-2", "3-7-3", "4-5-4", "5-3-1"],
-    },
-    fan: {
-      [today]: ["1-1-1", "1-1-6", "1-2-7", "1-3-8", "2-4-10", "2-5-12", "2-6-14"],
-      [tomorrow]: ["1-1-2", "1-2-5", "2-1-1", "2-2-9", "2-3-11"],
-      [dayAfter]: ["1-4-5", "1-5-8", "2-6-15", "2-7-18"],
-    },
-    theater: {
-      [today]: ["1-1-1", "1-2-3", "2-5-5", "2-7-7", "3-3-3", "4-2-2", "5-5-5", "6-1-1"],
-      [tomorrow]: ["1-1-2", "2-1-1", "2-2-2", "3-1-1", "5-1-1", "6-2-2"],
-      [dayAfter]: ["1-5-3", "2-10-5", "3-6-4", "4-4-3", "5-7-6"],
-    },
+// API call to get occupied seats
+const fetchOccupiedSeats = async (performanceId: string): Promise<OccupiedSeat[]> => {
+  try {
+    const response = await axios.get(`http://localhost:8081/reservations/occupied/${performanceId}`)
+    return response.data
+  } catch (error) {
+    console.error("Failed to fetch occupied seats:", error)
+    return []
   }
-
-  return bookedSeatsData[seatType]?.[dateKey] || []
 }
 
 const seatType = computed(() => 
   props.ticketCategory === "콘서트" ? "fan" : props.ticketCategory === "뮤지컬" ? "theater" : "standard"
 )
 
+const MAP_CONFIG = {
+  fan: { viewBox: "-300 0 1600 1000", width: 1600, height: 1000, minX: -300, minY: 0 },
+  theater: { viewBox: "0 0 1000 1000", width: 1000, height: 1000, minX: 0, minY: 0 },
+  standard: { viewBox: "0 0 1000 700", width: 1000, height: 700, minX: 0, minY: 0 }
+}
+
 const viewBoxSize = computed(() => 
-  seatType.value === "fan" ? "0 0 1000 850" : seatType.value === "theater" ? "0 0 1000 900" : "0 0 1000 700"
+  MAP_CONFIG[seatType.value].viewBox
 )
 
-const loadSeats = () => {
+const loadSeats = async () => {
+  if (!props.isOpen) return // Only load if open
+
   let baseSeats: Seat[] = []
   if (seatType.value === "fan") {
     baseSeats = generateFanSeats()
@@ -75,14 +87,27 @@ const loadSeats = () => {
     baseSeats = generateStandardSeats()
   }
 
-  const bookedSeatIds = getBookedSeatsForDate(selectedDate.value, seatType.value)
-  allSeats.value = baseSeats.map((seat) => ({
-    ...seat,
-    isBooked: bookedSeatIds.includes(seat.id),
-  }))
+  // Fetch real occupied seats from backend
+  const occupiedSeats = await fetchOccupiedSeats(props.performanceId)
+  
+  // Create a Set of occupied signatures for faster lookup
+  // Signature format: "${section}-${row}-${number}" (using values from DB)
+  // Note: We need to ensure types match (string vs number). DB returns strings?? DTO has Strings.
+  // seatDataGenerator uses numbers for row/number, strings for section.
+  const occupiedSet = new Set(occupiedSeats.map(s => `${s.section}-${s.row}-${s.number}`))
+
+  allSeats.value = baseSeats.map((seat) => {
+    // Generate signature for this seat using its properties
+    // Note: seat.row and seat.number are numbers, so standard string conversion applies
+    const signature = `${seat.section}-${seat.row}-${seat.number}`
+    return {
+      ...seat,
+      isBooked: occupiedSet.has(signature),
+    }
+  })
 }
 
-watch([seatType, selectedDate], loadSeats)
+watch([seatType, selectedDate, () => props.isOpen], loadSeats)
 onMounted(loadSeats)
 
 const findSeatByCoordinate = (clickX: number, clickY: number): Seat | null => {
@@ -103,11 +128,13 @@ const findSeatByCoordinate = (clickX: number, clickY: number): Seat | null => {
 const handleSeatClick = (e: MouseEvent) => {
   const target = e.currentTarget as HTMLDivElement
   const rect = target.getBoundingClientRect()
-  const scaleX = 1000 / rect.width
-  const scaleY = (seatType.value === "fan" ? 850 : seatType.value === "theater" ? 900 : 700) / rect.height
+  const config = MAP_CONFIG[seatType.value]
+  
+  const scaleX = config.width / rect.width
+  const scaleY = config.height / rect.height
 
-  const x = (e.clientX - rect.left) * scaleX
-  const y = (e.clientY - rect.top) * scaleY
+  const x = config.minX + (e.clientX - rect.left) * scaleX
+  const y = config.minY + (e.clientY - rect.top) * scaleY
 
   const clickedSeat = findSeatByCoordinate(x, y)
 
@@ -154,7 +181,28 @@ const handleConfirmBooking = () => {
   }
 
   // 부모 컴포넌트로 선택된 좌석 정보 전달
+  isProcessing.value = true
   emit('confirm', selectedSeats.value)
+}
+
+const closeModal = async () => {
+  console.log('Attempting to close modal. Token:', props.queueToken); // Debug log
+  if (!isProcessing.value && props.queueToken) {
+    try {
+      console.log('Sending expire request for token:', props.queueToken); // Debug log
+      await axios.post('http://localhost:8081/queue/expire', {
+        token: props.queueToken,
+        performanceId: props.performanceId,
+        scheduleId: 1
+      })
+      console.log('Queue token released successfully.')
+    } catch (e) {
+      console.warn('Failed to release queue token:', e)
+    }
+  } else {
+      console.log('Skipping release. Processing:', isProcessing.value, 'HasToken:', !!props.queueToken);
+  }
+  emit('close')
 }
 
 const totalPrice = computed(() => selectedSeats.value.reduce((acc, seat) => acc + seat.price, 0))
@@ -164,7 +212,7 @@ const totalPrice = computed(() => selectedSeats.value.reduce((acc, seat) => acc 
   <Transition name="fade">
     <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <!-- 오버레이 -->
-      <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" @click="emit('close')" />
+      <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" @click="closeModal" />
 
       <!-- 모달 -->
       <div class="relative bg-gradient-to-b from-gray-900 to-black border border-gray-800 rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col">
@@ -181,7 +229,7 @@ const totalPrice = computed(() => selectedSeats.value.reduce((acc, seat) => acc 
               </div>
             </div>
             <button
-              @click="emit('close')"
+              @click="closeModal"
               class="w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors"
             >
               <X class="h-5 w-5 text-white" />
