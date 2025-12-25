@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
 import { useRouter, useRoute } from "vue-router"
-import { Ticket, MapPin, Calendar, Clock, X, ChevronRight, User as UserIcon, Eye, EyeOff, Lock, Mail, Phone } from "lucide-vue-next"
+import { Ticket, MapPin, Calendar, Clock, X, ChevronRight, User as UserIcon, Eye, EyeOff, Lock, Mail, Phone, CreditCard } from "lucide-vue-next"
 
 import Button from "@/components/ui/Button.vue"
 import Input from "@/components/ui/Input.vue"
@@ -11,6 +11,7 @@ import DialogContent from "@/components/ui/DialogContent.vue"
 import DialogHeader from "@/components/ui/DialogHeader.vue"
 import DialogTitle from "@/components/ui/DialogTitle.vue"
 import DialogDescription from "@/components/ui/DialogDescription.vue"
+import Badge from "@/components/ui/Badge.vue"
 import { authService } from '@/api/authService'
 import { bookingService } from "@/api/bookingService"
 import { useAuthStore } from '@/stores/auth'
@@ -99,30 +100,11 @@ onMounted(async () => {
     return
   }
 
-  // 서버에서 최신 회원정보 가져오기
-  try {
-    const userInfo = await authService.getProfile()
-    console.log("Fetched user profile:", userInfo)
-
-    // 서버에서 받은 정보로 폼 채우기
+  const userInfo = authStore.userInfo
+  if (userInfo) {
     formData.value.name = userInfo.name || ''
     formData.value.phone = userInfo.phone || ''
     formData.value.email = userInfo.email || ''
-
-    // authStore도 업데이트
-    authStore.userInfo = userInfo
-    localStorage.setItem('userInfo', JSON.stringify(userInfo))
-  } catch (error) {
-    console.error("Failed to fetch user profile:", error)
-    toast.error("회원정보를 불러오는데 실패했습니다")
-
-    // 실패 시 로컬 정보로 폴백
-    const localUserInfo = authStore.userInfo
-    if (localUserInfo) {
-      formData.value.name = localUserInfo.name || ''
-      formData.value.phone = localUserInfo.phone || ''
-      formData.value.email = localUserInfo.email || ''
-    }
   }
 
   // 예약 내역 조회
@@ -240,6 +222,28 @@ const handleCancelReservation = async (reservationId: string) => {
     console.error('예약 취소 실패:', error)
     toast.error(error.response?.data?.message || '예약 취소에 실패했습니다')
   }
+}
+
+// 모달 닫기
+const closeDialog = () => {
+  selectedReservation.value = null
+}
+
+// 상태 배지 텍스트
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'CONFIRMED':
+      return '예매완료'
+    case 'CANCELLED':
+      return '취소됨'
+    default:
+      return '처리중'
+  }
+}
+
+// InfoRow 컴포넌트 (인라인)
+const InfoRow = ({ label, value }: { label: string; value: string }) => {
+  return { label, value }
 }
 </script>
 
@@ -581,51 +585,120 @@ const handleCancelReservation = async (reservationId: string) => {
       </div>
     </div>
 
-    <!-- 상세 모달 -->
-    <Dialog :open="!!selectedReservation" @update:open="(val) => !val && (selectedReservation = null)">
+    <!-- 상세 정보 모달 -->
+    <Dialog :open="selectedReservation !== null" @update:open="closeDialog">
       <DialogContent class="bg-gray-900 border-gray-800 text-white max-w-2xl">
         <DialogHeader>
-          <DialogTitle class="text-xl">예약 상세 정보</DialogTitle>
+          <DialogTitle class="flex items-center gap-2 text-2xl">
+            <Ticket class="h-6 w-6 text-red-500" />
+            예약 상세 정보
+          </DialogTitle>
           <DialogDescription class="text-gray-400">
             예약번호: {{ selectedReservation?.reservationId }}
           </DialogDescription>
         </DialogHeader>
 
-        <div v-if="selectedReservation" class="mt-6 space-y-4">
-          <div class="bg-gray-800/50 rounded-lg p-4 space-y-3">
-            <div class="flex justify-between">
-              <span class="text-gray-400">공연명</span>
-              <span class="text-white font-medium">{{ selectedReservation.performanceTitle }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">장소</span>
-              <span class="text-white">{{ selectedReservation.facilityName }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">관람일시</span>
-              <span class="text-white">{{ selectedReservation.performanceDate }} {{ selectedReservation.performanceTime }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">좌석</span>
-              <span class="text-white">{{ selectedReservation.seats.join(", ") }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">예약일시</span>
-              <span class="text-white">{{ selectedReservation.reservationDate }}</span>
-            </div>
-            <div class="flex justify-between text-lg font-bold pt-2 border-t border-gray-700">
-              <span class="text-gray-400">총 결제금액</span>
-              <span class="text-red-500">{{ selectedReservation.totalPrice.toLocaleString() }}원</span>
+        <div v-if="selectedReservation" class="mt-6 space-y-6">
+          <!-- 공연 정보 -->
+          <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+            <h3 class="text-white mb-3 flex items-center gap-2 font-semibold">
+              <Ticket class="h-5 w-5 text-red-500" />
+              공연 정보
+            </h3>
+
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-400">공연명</span>
+                <span class="text-white font-medium">{{ selectedReservation.performanceTitle }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">공연장</span>
+                <span class="text-white">{{ selectedReservation.facilityName }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">지역</span>
+                <span class="text-white">{{ selectedReservation.area }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">관람일시</span>
+                <span class="text-white">{{ selectedReservation.performanceDate }} {{ selectedReservation.performanceTime }}</span>
+              </div>
             </div>
           </div>
 
-          <Button
-            class="w-full bg-red-600 hover:bg-red-700 h-12"
-            @click="router.push(`/ticket/${selectedReservation.performanceId}`)"
-          >
-            공연 상세보기
-            <ChevronRight class="ml-2 w-5 h-5" />
-          </Button>
+          <!-- 예매 정보 -->
+          <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+            <h3 class="text-white mb-3 flex items-center gap-2 font-semibold">
+              <Calendar class="h-5 w-5 text-red-500" />
+              예매 정보
+            </h3>
+
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-400">예매일시</span>
+                <span class="text-white">{{ selectedReservation.reservationDate }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">좌석</span>
+                <span class="text-white">{{ selectedReservation.seats.join(', ') }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">매수</span>
+                <span class="text-white">{{ selectedReservation.seats.length }}매</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">예매상태</span>
+                <Badge
+                  :class="getStatusBadgeClass(selectedReservation.status)"
+                  class="text-xs"
+                >
+                  {{ getStatusBadge(selectedReservation.status) }}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <!-- 결제 정보 -->
+          <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+            <h3 class="text-white mb-3 flex items-center gap-2 font-semibold">
+              <CreditCard class="h-5 w-5 text-red-500" />
+              결제 정보
+            </h3>
+
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-400">결제수단</span>
+                <span class="text-white">신용카드</span>
+              </div>
+
+              <div class="flex justify-between pt-3 border-t border-gray-700">
+                <span class="text-white font-medium">총 결제금액</span>
+                <span class="text-xl font-bold text-red-500">
+                  {{ selectedReservation.totalPrice.toLocaleString() }}원
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 액션 버튼 -->
+          <div class="flex gap-3 pt-4">
+            <Button
+              class="flex-1 bg-red-600 hover:bg-red-700 h-12"
+              @click="router.push(`/ticket/${selectedReservation.performanceId}`)"
+            >
+              공연 상세보기
+              <ChevronRight class="ml-2 w-5 h-5" />
+            </Button>
+
+            <Button
+              v-if="selectedReservation.status === 'CONFIRMED'"
+              variant="outline"
+              class="border-red-600 text-red-600 hover:bg-red-600 hover:text-white h-12 px-6"
+              @click="handleCancelReservation(selectedReservation.reservationId); closeDialog()"
+            >
+              예약취소
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

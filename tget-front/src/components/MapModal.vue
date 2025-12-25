@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, nextTick, createApp, h } from "vue";
 import { useRouter } from "vue-router";
 import { X, MapPin, Calendar, Ticket, Info, ChevronLeft, ChevronRight } from "lucide-vue-next";
 import Button from "./ui/Button.vue";
@@ -10,6 +10,7 @@ import DialogContent from "./ui/DialogContent.vue";
 import DialogHeader from "./ui/DialogHeader.vue";
 import DialogTitle from "./ui/DialogTitle.vue";
 import DialogDescription from "./ui/DialogDescription.vue";
+import VenueMarker from "./VenueMarker.vue";
 
 declare global {
   interface Window {
@@ -45,7 +46,7 @@ const currentZoomLevel = ref(7); // 현재 줌 레벨 추적
 let scriptLoading = false;
 
 // 줌 레벨 임계값: 이 값 이하일 때 라벨 표시 (값이 작을수록 더 확대된 상태)
-const LABEL_VISIBLE_ZOOM_LEVEL = 3;
+const LABEL_VISIBLE_ZOOM_LEVEL = 5;
 
 // 지역별 캐시: key = `${region}::${genreId}`
 const regionCache = new Map<string, VenueInfo[]>();
@@ -233,13 +234,6 @@ const handleVenueClick = async (venue: VenueInfo) => {
   try {
     console.log("[MapModal] 공연장 클릭:", venue.name, "mt10id:", venue.mt10id);
 
-    // 먼저 지도를 해당 공연장 위치로 이동 (즉시 피드백)
-    if (map.value && venue.latitude && venue.longitude) {
-      const pos = new window.kakao.maps.LatLng(venue.latitude, venue.longitude);
-      map.value.setCenter(pos); // 정확히 중앙으로 이동
-      map.value.setLevel(4); // 라벨이 보이도록 줌 레벨 4로 확대
-      console.log("[MapModal] 지도를 공연장 중앙으로 즉시 이동, 줌 레벨: 4");
-    }
 
     // API 호출하여 상세정보 및 공연 목록 가져오기
     // mt10id, genreId, region을 함께 전달
@@ -430,26 +424,44 @@ const updateMarkers = () => {
         `[MapModal] LatLng 생성 성공: ${venue.name} (${venue.latitude}, ${venue.longitude})`
       );
 
-      // 안이 채워진 빨간색 핀 SVG로 마커 이미지 설정
-      const markerImage = new window.kakao.maps.MarkerImage(
-        'data:image/svg+xml;utf8,<svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 38C16 38 29 23.6928 29 14.5C29 7.04416 23.1797 1 16 1C8.8203 1 3 7.04416 3 14.5C3 23.6928 16 38 16 38Z" stroke="%23EF4444" stroke-width="3" fill="%23EF4444"/><circle cx="16" cy="15" r="5" stroke="white" stroke-width="3" fill="white"/></svg>',
-        new window.kakao.maps.Size(28, 36),
-        { offset: new window.kakao.maps.Point(16, 40) }
-      );
+      // Vue 컴포넌트를 DOM 요소로 렌더링
+      const markerContainer = document.createElement('div');
+      markerContainer.style.cssText = 'position: relative; width: 32px; height: 38px;';
 
-      const marker = new window.kakao.maps.Marker({
-        position: pos,
-        map: map.value,
-        image: markerImage,
-        zIndex: 1, // 기본 zIndex
+      const markerApp = createApp({
+        render() {
+          return h(VenueMarker, {
+            performanceCount: venue.performanceCount
+          });
+        }
       });
-      console.log(`[MapModal] ✅ 마커 생성 성공: ${venue.name}`);
+      markerApp.mount(markerContainer);
+
+      console.log(`[MapModal] 🎯 마커 컨테이너 생성:`, markerContainer.innerHTML ? '✅ 렌더링 성공' : '❌ 렌더링 실패');
+
+      // CustomOverlay로 마커 생성 (Vue 컴포넌트 사용)
+      const markerOverlay = new window.kakao.maps.CustomOverlay({
+        position: pos,
+        content: markerContainer,
+        xAnchor: 0.5, // 가로 중앙
+        yAnchor: 1, // 마커 하단이 좌표 위치에 오도록
+        zIndex: 1,
+      });
+
+      markerOverlay.setMap(map.value);
+
+      // 마커 클릭 이벤트
+      markerContainer.addEventListener('click', () => {
+        handleVenueClick(venue);
+      });
+
+      console.log(`[MapModal] ✅ 커스텀 마커 생성 성공: ${venue.name}, 공연 개수: ${venue.performanceCount}`);
 
       // 공연장 이름을 표시하는 CustomOverlay 생성
       const overlayContent = document.createElement('div');
       overlayContent.className = 'custom-overlay';
       overlayContent.style.cssText = `
-        padding: 6px 10px;
+        padding: 6px 11px;
         background: rgba(239, 68, 68, 0.95);
         color: white;
         font-size: 12px;
@@ -460,31 +472,27 @@ const updateMarkers = () => {
         cursor: pointer;
         user-select: none;
         transition: opacity 0.2s;
+        pointer-events: none;
       `;
       overlayContent.textContent = venue.name;
-      overlayContent.onclick = () => handleVenueClick(venue);
 
       const customOverlay = new window.kakao.maps.CustomOverlay({
         position: pos,
         content: overlayContent,
-        yAnchor: 2.3, // 호버 오버레이와 동일한 위치
+        xAnchor: 0.5, // 가로 중앙
+        yAnchor: 2.5, // 마커 위쪽에 표시 (더 높게, 마커와 겹치지 않게)
         zIndex: 100,
       });
+
 
       // 줌 레벨에 따라 초기 표시 여부 결정
       if (currentZoomLevel.value <= LABEL_VISIBLE_ZOOM_LEVEL) {
         customOverlay.setMap(map.value);
       }
 
-      // 마커 클릭 이벤트
-      window.kakao.maps.event.addListener(marker, "click", () => {
-        handleVenueClick(venue);
-      });
-
-      // 마우스 호버 이벤트 - 호버 시 항상 오버레이 표시 + 마커를 앞으로
-      window.kakao.maps.event.addListener(marker, "mouseover", () => {
-        // 마커를 최상단으로 이동
-        marker.setZIndex(9999);
+      // 마우스 호버 이벤트 - 호버 시 항상 오버레이 표시
+      markerContainer.addEventListener('mouseenter', () => {
+        markerOverlay.setZIndex(9999);
 
         // 호버 전용 오버레이 생성 (줌 레벨과 무관하게 표시)
         if (hoverOverlay.value) {
@@ -503,23 +511,23 @@ const updateMarkers = () => {
           box-shadow: 0 4px 12px rgba(0,0,0,0.4);
           cursor: pointer;
           user-select: none;
+          pointer-events: none;
         `;
         hoverContent.textContent = venue.name;
-        hoverContent.onclick = () => handleVenueClick(venue);
 
         hoverOverlay.value = new window.kakao.maps.CustomOverlay({
           position: pos,
           content: hoverContent,
-          yAnchor: 2.3, // 일반 오버레이와 동일한 위치
+          xAnchor: 0.5, // 가로 중앙
+          yAnchor: 2.5, // 마커 위쪽에 표시 (더 높게)
           map: map.value,
           zIndex: 10000, // 호버 시 더 위에 표시
         });
       });
 
       // 마우스 아웃 이벤트 - 호버 오버레이 제거 + 마커 원래 위치로
-      window.kakao.maps.event.addListener(marker, "mouseout", () => {
-        // 마커를 원래 zIndex로 복원
-        marker.setZIndex(1);
+      markerContainer.addEventListener('mouseleave', () => {
+        markerOverlay.setZIndex(1);
 
         if (hoverOverlay.value) {
           hoverOverlay.value.setMap(null);
@@ -527,7 +535,7 @@ const updateMarkers = () => {
         }
       });
 
-      markers.value.push(marker);
+      markers.value.push(markerOverlay);
       overlays.value.push(customOverlay);
       successCount++;
     } catch (error) {
