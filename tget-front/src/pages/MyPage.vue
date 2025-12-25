@@ -99,11 +99,30 @@ onMounted(async () => {
     return
   }
 
-  const userInfo = authStore.userInfo
-  if (userInfo) {
+  // 서버에서 최신 회원정보 가져오기
+  try {
+    const userInfo = await authService.getProfile()
+    console.log("Fetched user profile:", userInfo)
+
+    // 서버에서 받은 정보로 폼 채우기
     formData.value.name = userInfo.name || ''
     formData.value.phone = userInfo.phone || ''
     formData.value.email = userInfo.email || ''
+
+    // authStore도 업데이트
+    authStore.userInfo = userInfo
+    localStorage.setItem('userInfo', JSON.stringify(userInfo))
+  } catch (error) {
+    console.error("Failed to fetch user profile:", error)
+    toast.error("회원정보를 불러오는데 실패했습니다")
+
+    // 실패 시 로컬 정보로 폴백
+    const localUserInfo = authStore.userInfo
+    if (localUserInfo) {
+      formData.value.name = localUserInfo.name || ''
+      formData.value.phone = localUserInfo.phone || ''
+      formData.value.email = localUserInfo.email || ''
+    }
   }
 
   // 예약 내역 조회

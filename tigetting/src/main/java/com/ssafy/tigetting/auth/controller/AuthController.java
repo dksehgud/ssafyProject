@@ -49,6 +49,11 @@ public class AuthController {
         return authService.login(dto);
     }
 
+    @Operation(summary = "사용자 회원가입", description = "새로운 사용자 계정을 생성합니다. 이메일 인증이 필요합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "회원가입 성공", content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 (이메일 중복, 유효성 검사 실패 등)")
+    })
     @PostMapping("/signup")
     public AuthResponse signup(@Valid @RequestBody UserRegisterDto dto) {
         System.out.println("회원가입 시도 들어옴");

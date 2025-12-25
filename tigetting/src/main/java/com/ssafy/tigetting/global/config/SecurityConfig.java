@@ -96,6 +96,9 @@ public class SecurityConfig {
                 .requestMatchers("/admin/auth/**").hasRole("ADMIN")
                 .requestMatchers("/auth/**").permitAll()
 
+                // Swagger UI 및 API 문서 접근 허용
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
+
                 // 헬스체크 허용
                 .requestMatchers("/actuator/**").permitAll()
 
