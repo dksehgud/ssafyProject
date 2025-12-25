@@ -27,9 +27,13 @@ const authStore = useAuthStore()
 
 const isHomePage = computed(() => route.path === '/')
 const isMyPage = computed(() => route.path === '/mypage')
-const showNavigation = computed(() => isHomePage.value || isMyPage.value)
+const isTicketDetailPage = computed(() => route.path.startsWith('/ticket/'))
+const showNavigation = computed(() => isHomePage.value || isMyPage.value || isTicketDetailPage.value)
 const isDropdownOpen = ref(false)
 const isMobileMenuOpen = ref(false)
+
+// 선택된 카테고리 (props 사용)
+const currentCategory = computed(() => props.selectedCategory)
 
 /**
  * 인증 여부 확인
@@ -70,6 +74,11 @@ const isBusiness = computed(() => {
  * 카테고리 선택 핸들러
  */
 const handleCategoryClick = (category: string) => {
+  // 홈페이지가 아니면 먼저 홈으로 이동
+  if (!isHomePage.value) {
+    router.push('/')
+  }
+  // 카테고리 선택 이벤트 emit
   emit('categorySelect', category)
 }
 
@@ -88,19 +97,11 @@ const toggleDropdown = () => {
 }
 
 /**
- * 마이페이지 이동
- */
-const goToBookingPage = () => {
-  isDropdownOpen.value = false
-  router.push('/booking')
-  //toast.info('예약페이지로 이동합니다')
-}
-
-/**
  * 회원정보 이동
  */
 const goToMyPage = () => {
   isDropdownOpen.value = false
+  emit('categorySelect', null) // 카테고리 선택 해제
   router.push('/mypage')
   //toast.info('마이페이지로 이동합니다')
 }
@@ -110,6 +111,7 @@ const goToMyPage = () => {
  */
 const goToDashboard = () => {
   isDropdownOpen.value = false
+  emit('categorySelect', null) // 카테고리 선택 해제
   router.push('/dashboard')
   //toast.info('관리자 대시보드로 이동합니다')
 }
@@ -119,6 +121,7 @@ const goToDashboard = () => {
  */
 const goToBusiness = () => {
   isDropdownOpen.value = false
+  emit('categorySelect', null) // 카테고리 선택 해제
   router.push('/performance-management')
   //toast.info('공연 관리 대시보드로 이동합니다')
 }
@@ -160,7 +163,7 @@ const handleLogout = async () => {
             :key="category"
             @click="handleCategoryClick(category)"
             class="transition-colors text-sm xl:text-base"
-            :class="selectedCategory === category ? 'text-red-600' : 'text-gray-300 hover:text-red-600'"
+            :class="currentCategory === category ? 'text-red-600' : 'text-gray-300 hover:text-red-600'"
           >
             {{ category }}
           </button>
@@ -282,7 +285,7 @@ const handleLogout = async () => {
             :key="category"
             @click="handleCategoryClick(category); isMobileMenuOpen = false"
             class="text-left px-4 py-3 rounded-lg transition-colors"
-            :class="selectedCategory === category ? 'bg-red-600 text-white' : 'text-gray-300 hover:bg-gray-800'"
+            :class="currentCategory === category ? 'bg-red-600 text-white' : 'text-gray-300 hover:bg-gray-800'"
           >
             {{ category }}
           </button>
