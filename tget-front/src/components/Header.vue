@@ -73,8 +73,8 @@ const isAdmin = computed(() => {
 const isBusiness = computed(() => {
   console.log("🔍 userInfo:", userInfo.value)
   console.log("🔍 roleType:", userInfo.value?.roleType)
-  console.log("🔍 isBusiness:", userInfo.value?.roleType === 'BUSINESS')
-  return userInfo.value?.roleType === 'BUSINESS'
+  console.log("🔍 isBusiness:", userInfo.value?.roleType === 'BUSNIESS')
+  return userInfo.value?.roleType === 'BUSNIESS'
 })
 
 

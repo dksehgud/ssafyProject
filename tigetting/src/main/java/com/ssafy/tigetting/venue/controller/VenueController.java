@@ -26,8 +26,7 @@ public class VenueController {
 
     private final VenueService venueService;
 
-    @Operation(summary = "전체 공연장 조회",
-               description = "등록된 모든 공연장 목록을 조회합니다.")
+    @Operation(summary = "전체 공연장 조회", description = "등록된 모든 공연장 목록을 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
@@ -37,26 +36,22 @@ public class VenueController {
         return ResponseEntity.ok(venues);
     }
 
-    @Operation(summary = "권역별 공연장 조회",
-               description = "특정 권역의 공연장 목록을 조회합니다. 장르 필터링도 가능합니다.")
+    @Operation(summary = "권역별 공연장 조회", description = "특정 권역의 공연장 목록을 조회합니다. 장르 필터링도 가능합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping("/region")
     public ResponseEntity<List<VenueDto>> getVenuesByRegion(
-            @Parameter(description = "권역 (서울, 경기/인천, 충청/강원, 대구/경북, 부산/경남, 광주/전라, 제주, 기타)", required = true)
-            @RequestParam String region,
-            @Parameter(description = "장르 ID (선택사항)", required = false)
-            @RequestParam(required = false) Integer genreId) {
+            @Parameter(description = "권역 (서울, 경기/인천, 충청/강원, 대구/경북, 부산/경남, 광주/전라, 제주, 기타)", required = true) @RequestParam String region,
+            @Parameter(description = "장르 ID (선택사항)", required = false) @RequestParam(required = false) Integer genreId) {
         System.out.println("🔍 권역별 공연장 조회 요청 - region 권역: " + region);
         List<VenueDto> venues = venueService.getVenuesByRegion(region, genreId);
-        //System.out.println("venues performanceCount : " + venues.get(0).toString());
+        // System.out.println("venues performanceCount : " + venues.get(0).toString());
         System.out.println("✅ 조회된 공연장 수: " + venues.size());
         return ResponseEntity.ok(venues);
     }
 
-    @Operation(summary = "전체 지역 목록 조회",
-               description = "중복 제거된 모든 지역 목록을 조회합니다.")
+    @Operation(summary = "전체 지역 목록 조회", description = "중복 제거된 모든 지역 목록을 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
@@ -69,20 +64,29 @@ public class VenueController {
         return ResponseEntity.ok(areas);
     }
 
-    @Operation(summary = "공연장 상세 정보 조회",
-               description = "공연장의 상세 정보와 해당 공연장에서 진행되는 공연 목록을 조회합니다.")
+    @Operation(summary = "지역별 공연장 조회", description = "특정 지역(시도명)의 공연장 목록을 조회합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/area/{area}")
+    public ResponseEntity<List<VenueDto>> getVenuesByArea(
+            @Parameter(description = "지역명 (시도명)", required = true) @PathVariable String area) {
+        System.out.println("🔍 지역별 공연장 조회 요청 - area: " + area);
+        List<VenueDto> venues = venueService.getVenuesByArea(area);
+        System.out.println("✅ 조회된 공연장 수: " + venues.size());
+        return ResponseEntity.ok(venues);
+    }
+
+    @Operation(summary = "공연장 상세 정보 조회", description = "공연장의 상세 정보와 해당 공연장에서 진행되는 공연 목록을 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "404", description = "공연장을 찾을 수 없음")
     })
     @GetMapping("/detail/{mt10id}")
     public ResponseEntity<VenueDetailResponseDto> getVenueDetail(
-            @Parameter(description = "공연장 ID", required = true)
-            @PathVariable String mt10id,
-            @Parameter(description = "장르 ID (선택사항)", required = false)
-            @RequestParam(required = false) Integer genreId,
-            @Parameter(description = "권역 (선택사항)", required = false)
-            @RequestParam(required = false) String region) {
+            @Parameter(description = "공연장 ID", required = true) @PathVariable String mt10id,
+            @Parameter(description = "장르 ID (선택사항)", required = false) @RequestParam(required = false) Integer genreId,
+            @Parameter(description = "권역 (선택사항)", required = false) @RequestParam(required = false) String region) {
         System.out.println("🔍 공연장 상세정보 조회 요청 - mt10id: " + mt10id + ", genreId: " + genreId + ", region: " + region);
         VenueDetailResponseDto detail = venueService.getVenueDetail(mt10id, genreId, region);
         System.out.println(

@@ -65,7 +65,7 @@
           >
             <option :value="2">USER (일반 사용자)</option>
             <option :value="1">ADMIN (관리자)</option>
-            <option :value="3">BUSINESS (기업 회원)</option>
+            <option :value="3">BUSNIESS (기업 회원)</option>
           </select>
         </div>
 

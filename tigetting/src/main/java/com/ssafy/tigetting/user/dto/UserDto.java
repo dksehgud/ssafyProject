@@ -33,7 +33,7 @@ public class UserDto {
     private LocalDateTime register; // 가입일
 
     public enum Role {
-        USER, ADMIN, BUSINESS
+        USER, ADMIN, BUSNIESS
     }
 
     public static UserDto from(UserEntity user) {

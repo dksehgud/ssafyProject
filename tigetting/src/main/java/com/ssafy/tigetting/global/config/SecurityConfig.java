@@ -120,6 +120,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/api/venues/**").permitAll()
                 // 특정 하위 경로도 안전하게 허용
                 .requestMatchers("/api/venues/region", "/api/venues/region/**").permitAll()
+                .requestMatchers("/api/venues/area/**", "/api/venues/areas").permitAll()
 
                 // 정적 리소스 및 페이지 라우팅 허용
                 .requestMatchers("/", "/index.html", "/login.html", "/admin-login.html", "/admin.html")

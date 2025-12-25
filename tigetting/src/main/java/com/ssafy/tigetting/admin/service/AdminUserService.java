@@ -22,20 +22,20 @@ public class AdminUserService {
         int offset = page * size;
 
         // 역할 필터 처리 (문자열을 roleid로 변환)
-        // DB: 1=ADMIN, 2=USER, 3=BUSINESS
-        Integer roleid = null;
-        if (role != null && !role.isEmpty()) {
-            if ("USER".equalsIgnoreCase(role)) {
-                roleid = 2;
-            } else if ("ADMIN".equalsIgnoreCase(role)) {
-                roleid = 1;
-            } else if ("BUSINESS".equalsIgnoreCase(role)) {
-                roleid = 3;
+        // DB: 1=ADMIN, 2=USER, 3=BUSNIESS
+        Integer roleId = null;
+        if (role != null) {
+            if ("ADMIN".equalsIgnoreCase(role)) {
+                roleId = 1;
+            } else if ("USER".equalsIgnoreCase(role)) {
+                roleId = 2;
+            } else if ("BUSNIESS".equalsIgnoreCase(role)) {
+                roleId = 3;
             }
         }
 
-        List<Map<String, Object>> users = adminUserMapper.getUserList(offset, size, search, roleid);
-        int totalCount = adminUserMapper.getUserCount(search, roleid);
+        List<Map<String, Object>> users = adminUserMapper.getUserList(offset, size, search, roleId);
+        int totalCount = adminUserMapper.getUserCount(search, roleId);
 
         Map<String, Object> result = new HashMap<>();
         result.put("users", users);

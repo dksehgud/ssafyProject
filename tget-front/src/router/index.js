@@ -160,7 +160,7 @@ router.beforeEach((to, from, next) => {
         next('/')
     }
     // 기업회원 권한이 필요한 페이지
-    else if (to.meta.requiresBusiness && roleType !== 'BUSINESS') {
+    else if (to.meta.requiresBusiness && roleType !== 'BUSNIESS') {
         console.log("⛔ 기업회원 권한 필요: " + to.path)
         next('/')
     }
