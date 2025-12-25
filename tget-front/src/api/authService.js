@@ -48,9 +48,10 @@ export const authService = {
     },
 
     async getProfile() {
-        const response = await api.get('/auth/modify')
+        const response = await api.get('/auth/me')
         return response.data
     },
+
 
     /**
      * 이메일 인증번호 전송

@@ -13,8 +13,9 @@ const selectedCategory = ref<string | null>(null);
 const isAuthPage = computed(() => route.path === "/login" || route.path === "/signup");
 const isDetailPage = computed(() => route.path.startsWith("/ticket/"));
 const isPerformancePage = computed(() => route.path.startsWith("/performance-"));
+const isAdminPage = computed(() => route.path.startsWith("/admin"));
 const skipSplash = computed(
-  () => isAuthPage.value || isDetailPage.value || isPerformancePage.value
+  () => isAuthPage.value || isDetailPage.value || isPerformancePage.value || isAdminPage.value
 );
 
 const handleSplashComplete = () => {
@@ -37,7 +38,7 @@ const handleCategorySelect = (category: string | null) => {
     <Transition name="fade">
       <div v-if="!showSplash || skipSplash">
         <Header
-          v-if="!isAuthPage"
+          v-if="!isAuthPage && !isAdminPage"
           :selectedCategory="selectedCategory"
           @categorySelect="handleCategorySelect"
         />

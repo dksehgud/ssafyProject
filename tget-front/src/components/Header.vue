@@ -5,7 +5,7 @@
 
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
-import { ChevronDown, LogOut, User } from 'lucide-vue-next'
+import { ChevronDown, LogOut, User, Shield } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -109,11 +109,10 @@ const goToMyPage = () => {
 /**
  * 대시보드 이동 (관리자 전용)
  */
-const goToDashboard = () => {
+const goToAdminPage = () => {
   isDropdownOpen.value = false
   emit('categorySelect', null) // 카테고리 선택 해제
-  router.push('/dashboard')
-  //toast.info('관리자 대시보드로 이동합니다')
+  router.push('/admin')
 }
 
 /**
@@ -185,6 +184,16 @@ const handleLogout = async () => {
       <div class="flex items-center gap-2 sm:gap-3">
         <!-- 로그인 상태: 사용자 드롭다운 메뉴 -->
         <template v-if="isAuthenticated">
+          <!-- 관리자 모드 버튼 (ADMIN 권한만) -->
+          <button
+            v-if="isAdmin"
+            @click="goToAdminPage"
+            class="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
+          >
+            <Shield class="h-4 w-4" />
+            <span class="hidden sm:inline">관리자 모드</span>
+          </button>
+
           <div class="relative">
             <!-- 사용자 이름 버튼 -->
             <button 
@@ -202,22 +211,6 @@ const handleLogout = async () => {
                 v-if="isDropdownOpen"
                 class="absolute right-0 mt-2 w-44 sm:w-48 bg-gray-900 border border-gray-800 rounded-lg shadow-xl overflow-hidden"
               >
-                <!-- 관리자 전용 메뉴 -->
-                <template v-if="isAdmin">
-                  <div class="border-t border-gray-800"></div>
-                  <button
-                    @click="goToDashboard"
-                    class="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-800 hover:text-blue-500 transition-colors flex items-center gap-2"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="3" width="7" height="7"></rect>
-                      <rect x="14" y="3" width="7" height="7"></rect>
-                      <rect x="14" y="14" width="7" height="7"></rect>
-                      <rect x="3" y="14" width="7" height="7"></rect>
-                    </svg>
-                    관리자 대시보드
-                  </button>
-                </template>
 
                 <!-- 기업회원 전용 메뉴 -->
                 <template v-if="isBusiness">

@@ -237,9 +237,11 @@ const formatDate = (start: string, end: string) => {
 
               <div class="flex items-start gap-3 text-gray-300">
                 <Tag class="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <div class="text-sm text-gray-500">가격</div>
-                  <div class="text-2xl text-red-600">{{ ticket.ticketPrice }}</div>
+                <div class="w-full">
+                  <div class="text-sm text-gray-500 mb-1">가격</div>
+                  <div class="text-lg text-red-600 leading-relaxed whitespace-pre-line">
+                    {{ ticket.ticketPrice.replace(/원,\s*/g, '원\n').replace(/원$/g, '원') }}
+                  </div>
                 </div>
               </div>
             </div>
