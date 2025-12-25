@@ -16,6 +16,7 @@ import PerformanceManagementPage from '@/pages/PerformanceManagementPage.vue'
 import PerformanceRegistrationPage from '@/pages/PerformanceRegistrationPage.vue'
 import SignupPage from '@/pages/SignupPage.vue'
 import TicketDetailPage from '@/pages/TicketDetailPage.vue'
+import AdminPage from '@/pages/AdminPage.vue'
 
 // Auth Store import
 import { useAuthStore } from '@/stores/auth'
@@ -123,6 +124,12 @@ const router = createRouter({
             component: PerformanceEditPage,
             meta: { requiresAuth: true, requiresBusiness: true }  // 기업회원만 접근 가능
         },
+        {
+            path: '/admin',
+            name: 'admin',
+            component: AdminPage,
+            meta: { requiresAuth: true, requiresAdmin: true }  // 관리자만 접근 가능
+        },
     ]
 })
 
@@ -140,11 +147,22 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
     const authStore = useAuthStore()
     const isAuthenticated = authStore.isAuthenticated
+    const roleType = authStore.userInfo?.roleType
 
     // 인증이 필요한 페이지인데 미인증 상태
     if (to.meta.requiresAuth && !isAuthenticated) {
         console.log("⛔ 인증 필요: " + to.path)
         next('/login')
+    }
+    // 관리자 권한이 필요한 페이지
+    else if (to.meta.requiresAdmin && roleType !== 'ADMIN') {
+        console.log("⛔ 관리자 권한 필요: " + to.path)
+        next('/')
+    }
+    // 기업회원 권한이 필요한 페이지
+    else if (to.meta.requiresBusiness && roleType !== 'BUSINESS') {
+        console.log("⛔ 기업회원 권한 필요: " + to.path)
+        next('/')
     }
     // 게스트 전용 페이지인데 로그인 상태
     else if (to.meta.guestOnly && isAuthenticated) {
