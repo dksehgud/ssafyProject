@@ -18,15 +18,35 @@ const progress = ref(0)
 const errorMessage = ref<string | null>(null)
 
 let pollingTimer: number | null = null
+let simulationTimer: number | null = null
 
 // 진행률 계산 (단순 시각적 효과) - 실제로는 대기 순번 감소 비율로 해야 정확함
 const updateProgress = (currentPos: number, initialPos: number) => {
     if (initialPos <= 0) return 100
     const percent = Math.max(0, Math.min(100, ((initialPos - currentPos) / initialPos) * 100))
-    progress.value = percent
+    // 시뮬레이션 모드에서는 99%까지만 진행 (실제 완료 신호 대기)
+    progress.value = Math.min(percent, 99)
 }
 
 const initialPos = ref(props.initialWaitingCount || 100)
+
+// 시연용 시뮬레이션 로직
+const runSimulation = () => {
+    if (waitingCount.value > 1) {
+        // 랜덤하게 3~8명씩 줄어들게 설정
+        const decrement = Math.floor(Math.random() * 6) + 3
+        const nextCount = Math.max(1, waitingCount.value - decrement)
+        
+        waitingCount.value = nextCount
+        
+        // 시간도 조금씩 줄이기 (0분 밑으로는 안가게)
+        if (estimatedTime.value > 0 && Math.random() > 0.7) {
+            estimatedTime.value = Math.max(1, estimatedTime.value - 1)
+        }
+
+        updateProgress(nextCount, initialPos.value)
+    }
+}
 
 const pollStatus = async () => {
   try {
@@ -36,6 +56,9 @@ const pollStatus = async () => {
       // 내 순서 도달!
       progress.value = 100
       if (pollingTimer) clearInterval(pollingTimer)
+      if (simulationTimer) clearInterval(simulationTimer)
+      // 타임 기반 애니메이션 중지
+      if (animationFrameId) cancelAnimationFrame(animationFrameId)
       
       // 잠시 성공 화면 보여주고 완료 처리
       setTimeout(() => {
@@ -47,24 +70,35 @@ const pollStatus = async () => {
     if (data.status === 'EXPIRED') {
         errorMessage.value = "대기 시간이 만료되었습니다. 다시 시도해주세요."
         if (pollingTimer) clearInterval(pollingTimer)
+        if (simulationTimer) clearInterval(simulationTimer)
+        if (animationFrameId) cancelAnimationFrame(animationFrameId)
         return
     }
 
-    // 대기 중 업데이트
+    // 대기 인원 및 시간 업데이트 (화면 표시용)
     waitingCount.value = data.positionInQueue
     estimatedTime.value = data.estimatedWaitTime
-    
-    // 초기 위치 기준 진행률 업데이트 (대략적)
-    if (data.positionInQueue > initialPos.value) {
-        initialPos.value = data.positionInQueue // 불어난 경우 재설정
-    }
-    updateProgress(data.positionInQueue, initialPos.value)
+
+    // 프로그레스바는 시간 기반으로 별도 작동하므로 여기서는 업데이트 안 함
 
   } catch (error) {
     console.error('Queue polling error:', error)
-    // 일시적 에러는 무시하고 계속 재시도, 치명적 에러면 중단 로직 추가 가능
-    // errorMessage.value = "서버 연결에 실패했습니다."
   }
+}
+
+// 5초 동안 0% -> 99% 차오르는 애니메이션
+let animationFrameId: number | null = null
+const startTime = Date.now()
+const DURATION = 5000 // 5초
+
+const animateProgress = () => {
+    const elapsed = Date.now() - startTime
+    const percent = Math.min((elapsed / DURATION) * 100, 99)
+    progress.value = percent
+    
+    if (percent < 99) {
+        animationFrameId = requestAnimationFrame(animateProgress)
+    }
 }
 
 onMounted(() => {
@@ -72,12 +106,18 @@ onMounted(() => {
   pollStatus()
   // 1초마다 폴링
   pollingTimer = window.setInterval(pollStatus, 1000)
+  
+  // 시연용 시뮬레이션 (대기 인원 줄어드는 효과) 유지
+  simulationTimer = window.setInterval(runSimulation, 800)
+  
+  // 5초 프로그레스바 애니메이션 시작
+  animateProgress()
 })
 
 onUnmounted(() => {
-  if (pollingTimer) {
-    clearInterval(pollingTimer)
-  }
+  if (pollingTimer) clearInterval(pollingTimer)
+  if (simulationTimer) clearInterval(simulationTimer)
+  if (animationFrameId) cancelAnimationFrame(animationFrameId)
 })
 
 const handleCancel = () => {

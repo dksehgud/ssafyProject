@@ -3,6 +3,7 @@ package com.ssafy.tigetting.recommendation.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ssafy.tigetting.performance.dto.PerformanceDto;
 import com.ssafy.tigetting.recommendation.dto.AIRecommendationRequest;
 import com.ssafy.tigetting.recommendation.dto.AIRecommendationResponse;
 import com.ssafy.tigetting.recommendation.dto.PerformanceForAI;
@@ -76,15 +77,15 @@ public class ClaudeAIService {
          * 개인화 추천 생성
          */
         public List<String> personalizeRecommendations(
-                        List<String> baseRecommendationIds,
+                        List<PerformanceDto> candidates,
                         List<UserBookingHistory> userHistory,
                         int count) {
 
-                log.info("🎯 AI 개인화 추천 시작 - 기본 추천: {}, 사용자 이력: {}, 목표: {}",
-                                baseRecommendationIds.size(), userHistory.size(), count);
+                log.info("🎯 AI 개인화 추천 시작 - 후보: {}, 사용자 이력: {}, 목표: {}",
+                                candidates.size(), userHistory.size(), count);
 
                 try {
-                        String prompt = buildPersonalizationPrompt(baseRecommendationIds, userHistory, count);
+                        String prompt = buildPersonalizationPrompt(candidates, userHistory, count);
                         String response = callClaudeAPI(prompt);
                         List<String> recommendations = parseRecommendations(response);
 
@@ -94,7 +95,10 @@ public class ClaudeAIService {
                 } catch (Exception e) {
                         log.error("❌ AI 개인화 추천 실패", e);
                         // 폴백: 기본 추천에서 상위 N개 반환
-                        return baseRecommendationIds.subList(0, Math.min(count, baseRecommendationIds.size()));
+                        return candidates.stream()
+                                        .limit(count)
+                                        .map(PerformanceDto::getMt20id)
+                                        .toList();
                 }
         }
 
@@ -180,7 +184,7 @@ public class ClaudeAIService {
          * 개인화 프롬프트 생성
          */
         private String buildPersonalizationPrompt(
-                        List<String> baseIds,
+                        List<PerformanceDto> candidates,
                         List<UserBookingHistory> userHistory,
                         int count) {
 
@@ -202,7 +206,7 @@ public class ClaudeAIService {
                                         ? history.getArea().substring(0, 15)
                                         : history.getArea();
 
-                        historyText.append(String.format("- %s (%s, G%d)\\n",
+                        historyText.append(String.format("- %s (%s, G%d)\n",
                                         prfnm,
                                         area,
                                         history.getGenreid()));
@@ -216,6 +220,19 @@ public class ClaudeAIService {
                                 .map(e -> "G" + e.getKey())
                                 .reduce((a, b) -> a + ", " + b)
                                 .orElse("없음");
+
+                // 추천 후보 목록 포맷팅 (ID, 제목, 장르)
+                StringBuilder candidatesText = new StringBuilder();
+                for (PerformanceDto p : candidates) {
+                        String prfnm = p.getPrfnm() != null && p.getPrfnm().length() > 20
+                                        ? p.getPrfnm().substring(0, 20)
+                                        : p.getPrfnm();
+
+                        candidatesText.append(String.format("- [%s] %s (G%s)\n",
+                                        p.getMt20id(),
+                                        prfnm, // 제목 포함!
+                                        p.getGenreName() != null ? p.getGenreName() : "Unknown"));
+                }
 
                 return String.format("""
                                 # 개인화 공연 추천 시스템
@@ -235,14 +252,14 @@ public class ClaudeAIService {
                                 %s
 
                                 ## 추천 후보 (Candidates)
-                                다음 공연 ID 중에서 선택하세요:
+                                형식: [ID] 제목 (장르)
+                                다음 공연들 중에서만 선택하세요:
                                 %s
 
                                 ## 개인화 전략 (Personalization Strategy)
-                                1. **선호 장르 우선**: 사용자가 자주 예매한 장르 우선 고려
-                                2. **취향 확장**: 선호 장르 외에도 새로운 경험 1-2개 포함
-                                3. **지역 선호도**: 자주 방문한 지역의 공연 고려
-                                4. **품질 보장**: 검증된 작품과 신선한 기획의 균형
+                                1. **취향 매칭**: 사용자가 예매한 공연의 제목이나 스타일과 유사한 공연을 찾으세요.
+                                2. **장르 선호도**: 사용자가 자주 예매한 장르를 우선 고려하세요.
+                                3. **다양성**: 선호 장르 외에도 새로운 경험 1-2개를 포함하세요.
 
                                 ## 출력 형식 (Output Format)
                                 반드시 아래 JSON 형식만 출력하세요.
@@ -254,14 +271,15 @@ public class ClaudeAIService {
 
                                 ## 중요 지침 (Important Notes)
                                 - 정확히 %d개를 선정하세요
+                                - **제목의 유사성을 적극적으로 활용하세요.**
                                 - 사용자 이력과의 연관성이 높은 순서로 정렬하세요
-                                - 추천 후보 목록에서만 선택하세요
+                                - 반드시 위의 '추천 후보' 목록에 있는 ID만 사용해야 합니다.
                                 """,
                                 count,
                                 limitedHistory.size(),
                                 historyText.toString(),
                                 preferredGenres,
-                                baseIds,
+                                candidatesText.toString(), // ID 리스트 대신 상세 정보 전달
                                 count);
         }
 

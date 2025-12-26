@@ -277,15 +277,18 @@ public class RecommendationService {
             List<String> baseRecommendationIds = aiRecommendationMapper.findIdsByGenreId(genre, genreCount);
 
             if (baseRecommendationIds != null && !baseRecommendationIds.isEmpty()) {
-                // AI 개인화 추천
-                List<String> personalizedIds = claudeAIService.personalizeRecommendations(
-                        baseRecommendationIds,
-                        userHistory,
-                        perGenre);
-                if (personalizedIds != null && !personalizedIds.isEmpty()) {
-                    List<PerformanceDto> performances = performanceMapper.selectByIds(personalizedIds);
-                    if (performances != null && !performances.isEmpty()) {
-                        result.addAll(performances);
+                // AI 개인화 추천 (제목 기반 매칭을 위해 상세 정보 조회)
+                List<PerformanceDto> candidates = performanceMapper.selectByIds(baseRecommendationIds);
+                if (candidates != null && !candidates.isEmpty()) {
+                    List<String> personalizedIds = claudeAIService.personalizeRecommendations(
+                            candidates,
+                            userHistory,
+                            perGenre);
+                    if (personalizedIds != null && !personalizedIds.isEmpty()) {
+                        List<PerformanceDto> performances = performanceMapper.selectByIds(personalizedIds);
+                        if (performances != null && !performances.isEmpty()) {
+                            result.addAll(performances);
+                        }
                     }
                 }
             } else {
@@ -327,8 +330,14 @@ public class RecommendationService {
         }
 
         // 3. AI 개인화 추천
+        List<PerformanceDto> candidates = performanceMapper.selectByIds(baseRecommendationIds);
+
+        if (candidates == null || candidates.isEmpty()) {
+            return getBaseRecommendations(genreId, limit);
+        }
+
         List<String> personalizedIds = claudeAIService.personalizeRecommendations(
-                baseRecommendationIds,
+                candidates,
                 userHistory,
                 limit);
 
@@ -389,7 +398,6 @@ public class RecommendationService {
         // 기존 추천 삭제
         aiRecommendationMapper.deleteByGenreId(genreId);
 
-        // 새 추천 저장
         List<AIRecommendation> recommendations = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
 
@@ -406,6 +414,44 @@ public class RecommendationService {
             aiRecommendationMapper.saveAll(recommendations);
             log.info("✅ 장르 {} 추천 {} 개 저장 완료", genreId, recommendations.size());
         }
+    }
+
+    /**
+     * 특정 공연과 유사한 공연 추천 (상세 페이지용)
+     * 현재 로직: 같은 장르의 다른 공연 추천
+     */
+    public List<PerformanceDto> getSimilarPerformances(String performanceId) {
+        log.info("🤝 유사 공연 추천 요청 - performanceId: {}", performanceId);
+
+        // 1. 대상 공연 정보 조회 (장르 확인용)
+        PerformanceDto target = performanceMapper.findById(performanceId).orElse(null);
+        if (target == null) {
+            log.warn("❌ 공연 정보를 찾을 수 없음: {}", performanceId);
+            return new ArrayList<>();
+        }
+
+        Integer genreId = null;
+        if ("클래식".equals(target.getGenreName()))
+            genreId = 1;
+        else if ("콘서트".equals(target.getGenreName()))
+            genreId = 2;
+        else if ("뮤지컬".equals(target.getGenreName()))
+            genreId = 3;
+        else if ("연극".equals(target.getGenreName()))
+            genreId = 4;
+
+        // 2. 같은 장르 공연 조회 (최대 4개 + 여유분)
+        List<PerformanceDto> candidates = getAllPerformancesByGenre(genreId);
+
+        // 3. 현재 공연 제외 및 랜덤 섞기
+        List<PerformanceDto> results = candidates.stream()
+                .filter(p -> !p.getMt20id().equals(performanceId)) // 자기 자신 제외
+                .collect(Collectors.toList());
+
+        Collections.shuffle(results);
+
+        // 4. 최대 4개 반환
+        return results.subList(0, Math.min(4, results.size()));
     }
 
     /**

@@ -58,14 +58,17 @@
             parameterType="int"
             resultType="com.ssafy.tigetting.recommendation.dto.UserBookingHistory">
         SELECT 
-            NULL as prfnm,
-            NULL as fcltynm,
-            NULL as area,
-            NULL as bookingDate,
+            p.prfnm,
+            p.fcltynm,
+            p.area,
+            r.reserved_at as bookingDate,
             NULL as viewDate,
-            NULL as genreid
-        FROM DUAL
-        WHERE 1=0
+            p.genreid
+        FROM reservations r
+        JOIN performances p ON r.mt20id = p.mt20id
+        WHERE r.userid = #{userid}
+        ORDER BY r.reserved_at DESC
+        LIMIT 10
     </select>
 
 </mapper>

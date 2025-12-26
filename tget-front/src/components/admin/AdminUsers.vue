@@ -21,7 +21,7 @@
         <select v-model="selectedRole" @change="handleFilterChange" class="filter-select">
           <option value="all">전체 권한</option>
           <option value="USER">일반</option>
-          <option value="BUSNIESS">기업 사용자</option>
+          <option value="BUSINESS">기업 사용자</option>
           <option value="ADMIN">관리자</option>
         </select>
       </div>

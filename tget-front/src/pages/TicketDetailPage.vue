@@ -4,6 +4,7 @@ import ImageWithFallback from "@/components/figma/ImageWithFallback.vue";
 import NetflixCalendar from "@/components/NetflixCalendar.vue";
 import SeatSelectionModal from "@/components/SeatSelectionModal.vue";
 import QueuePollingModal from "@/components/QueuePollingModal.vue";
+import TicketCard from "@/components/TicketCard.vue";
 import Badge from "@/components/ui/Badge.vue";
 import Button from "@/components/ui/Button.vue";
 import { queueService } from "@/api/queueService";
@@ -23,7 +24,39 @@ const initialQueueData = ref({ waiting: 0, estimatedTime: 0 });
 
 const selectedDate = ref<Date | null>(null);
 const ticket = ref<any>(null);
+
 const isLoading = ref(true);
+
+const recommendations = ref<any[]>([]);
+const isLoadingRecommendations = ref(true);
+
+const mapPerformance = (item: any) => {
+    // genreId를 한글 카테고리명으로 매핑
+  const genreIdToCategory: Record<number, string> = {
+    1: "클래식",
+    2: "콘서트",
+    3: "뮤지컬",
+    4: "연극",
+  };
+  
+  const categoryName = item.genreId 
+    ? genreIdToCategory[item.genreId] || item.genreName || item.category || ""
+    : item.genreName || item.category || "";
+
+  return {
+      performanceId: item.mt20id || item.id || item.performanceId || "",
+      title: item.prfnm || item.title || "",
+      dateStart: item.prfpdfrom || item.dateStart || "",
+      dateEnd: item.prfpdto || item.dateEnd || "",
+      facilityName: item.fcltynm || item.facilityName || "",
+      ticketPrice: item.ticketPrice || "",
+      poster: item.poster || item.image || "",
+      area: item.area || item.region || "",
+      genre: item.genreName || item.genre || "",
+      state: item.prfstate || item.state || "",
+      category: categoryName,
+    };
+};
 
 const handleReserve = async () => {
   if (!ticket.value || !selectedDate.value) return;
@@ -126,6 +159,25 @@ onMounted(async () => {
     console.error("Failed to fetch ticket:", error);
   } finally {
     isLoading.value = false;
+  }
+
+  // 추천 공연 로드 (별도로 진행하여 메인 컨텐츠 로딩에 영향 주지 않도록 함)
+  if (id) {
+      try {
+          const token = localStorage.getItem("accessToken");
+          const recData = await ticketService.getRecommendations(id, token);
+          if (Array.isArray(recData)) {
+              recommendations.value = recData.map(mapPerformance);
+          } else if (recData && Array.isArray(recData.recommendations)) {
+              // 백엔드 응답 구조가 객체 내 배열인 경우 대비
+              recommendations.value = recData.recommendations.map(mapPerformance);
+          }
+          console.log("🔥 추천 공연 정보:", recommendations.value);
+      } catch (error) {
+          console.error("Failed to fetch recommendations:", error);
+      } finally {
+          isLoadingRecommendations.value = false;
+      }
   }
 });
 
@@ -415,6 +467,25 @@ const formatDate = (start: string, end: string) => {
           </div>
         </Transition>
       </div>
+
+      <!-- 추천 공연 섹션 -->
+       <Transition name="fade-slide-up" appear>
+        <div v-if="recommendations.length > 0" class="mt-20">
+          <Separator class="bg-gray-800 mb-12" />
+          
+          <h2 class="text-2xl text-white font-bold mb-8 flex items-center gap-2">
+            ✨ 이 공연과 비슷한 공연
+          </h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+             <TicketCard
+                v-for="rec in recommendations"
+                :key="rec.performanceId"
+                v-bind="rec"
+              />
+          </div>
+        </div>
+      </Transition>
     </div>
 
     <!-- 대기열 폴링 모달 -->
@@ -456,14 +527,27 @@ const formatDate = (start: string, end: string) => {
   transform: translateX(-30px);
 }
 
+.fade-slide-left-enter-from,
+.fade-slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
 .fade-slide-left-enter-active,
 .fade-slide-left-leave-active {
   transition: opacity 0.6s ease, transform 0.6s ease;
 }
 
-.fade-slide-left-enter-from,
-.fade-slide-left-leave-to {
+
+
+.fade-slide-up-enter-active,
+.fade-slide-up-leave-active {
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.fade-slide-up-enter-from,
+.fade-slide-up-leave-to {
   opacity: 0;
-  transform: translateX(30px);
+  transform: translateY(30px);
 }
 </style>

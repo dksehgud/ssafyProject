@@ -59,4 +59,11 @@ export const ticketService = {
     const response = await api.get(`/api/venues/detail/${venueId}`, { params });
     return response.data;
   },
+
+  // 공연 상세 - 추천 공연 조회
+  async getRecommendations(performanceId, token) {
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const response = await api.get(`/performances/${performanceId}/recommendations`, { headers });
+    return response.data;
+  },
 };

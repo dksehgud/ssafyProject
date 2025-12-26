@@ -43,17 +43,14 @@ public class PerformanceController {
     private final RecommendationService recommendationService;
     private final UserMapper userMapper;
 
-    @Operation(summary = "메인 페이지 공연 목록 조회",
-               description = "장르별 전체 공연 목록과 AI 추천을 함께 조회합니다. 로그인 시 개인화 추천을 제공합니다.")
+    @Operation(summary = "메인 페이지 공연 목록 조회", description = "장르별 전체 공연 목록과 AI 추천을 함께 조회합니다. 로그인 시 개인화 추천을 제공합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping("/main")
     public ResponseEntity<PagePerformanceResponse> getAllPerformances(
-            @Parameter(description = "장르 ID (null=전체, 1=클래식, 2=콘서트, 3=뮤지컬, 4=연극)", required = false)
-            @RequestParam(value = "genreId", required = false) Integer genreId,
-            @Parameter(description = "JWT 토큰 (로그인 시)", required = false)
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @Parameter(description = "장르 ID (null=전체, 1=클래식, 2=콘서트, 3=뮤지컬, 4=연극)", required = false) @RequestParam(value = "genreId", required = false) Integer genreId,
+            @Parameter(description = "JWT 토큰 (로그인 시)", required = false) @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
         // JWT 토큰에서 userId 추출
         Integer userId = extractUserId(authHeader);
@@ -83,28 +80,24 @@ public class PerformanceController {
         return null;
     }
 
-    @Operation(summary = "공연 상세 정보 조회",
-               description = "공연 ID로 상세 정보를 조회합니다.")
+    @Operation(summary = "공연 상세 정보 조회", description = "공연 ID로 상세 정보를 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "404", description = "공연을 찾을 수 없음")
     })
     @GetMapping("/{id}")
     public ResponseEntity<PerformanceDetailDto> getPerformanceDetail(
-            @Parameter(description = "공연 ID", required = true)
-            @PathVariable String id) {
+            @Parameter(description = "공연 ID", required = true) @PathVariable String id) {
         return ResponseEntity.ok(performanceService.getPerformanceDetail(id));
     }
 
-    @Operation(summary = "대기열 정보 조회",
-               description = "공연의 현재 대기 인원 정보를 조회합니다.")
+    @Operation(summary = "대기열 정보 조회", description = "공연의 현재 대기 인원 정보를 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping("/{id}/queue")
     public ResponseEntity<Map<String, Object>> getQueue(
-            @Parameter(description = "공연 ID", required = true)
-            @PathVariable String id) {
+            @Parameter(description = "공연 ID", required = true) @PathVariable String id) {
         // 랜덤 대기 인원 생성 (0~10명)
         int randomQueue = (int) (Math.random() * 3) + 1;
 
@@ -115,23 +108,30 @@ public class PerformanceController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "내 공연 목록 조회",
-               description = "로그인한 사용자가 등록한 공연 목록을 조회합니다.")
+    @Operation(summary = "유사 공연 추천", description = "현재 공연과 유사한 공연들을 추천합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/{id}/recommendations")
+    public ResponseEntity<List<PerformanceDto>> getRecommendation(
+            @Parameter(description = "공연 ID", required = true) @PathVariable String id) {
+        return ResponseEntity.ok(recommendationService.getSimilarPerformances(id));
+    }
+
+    @Operation(summary = "내 공연 목록 조회", description = "로그인한 사용자가 등록한 공연 목록을 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "401", description = "인증 실패")
     })
     @GetMapping("/my")
     public ResponseEntity<List<PerformanceDto>> getMyPerformances(
-            @Parameter(description = "JWT 토큰", required = true)
-            @RequestHeader("Authorization") String authHeader) {
+            @Parameter(description = "JWT 토큰", required = true) @RequestHeader("Authorization") String authHeader) {
         String token = authHeader.replace("Bearer ", "");
         String email = jwtUtil.extractUsername(token);
         return ResponseEntity.ok(performanceService.getMyPerformances(email));
     }
 
-    @Operation(summary = "공연 등록",
-               description = "새로운 공연을 등록합니다. 관리자 또는 공연 관리자 권한이 필요합니다.")
+    @Operation(summary = "공연 등록", description = "새로운 공연을 등록합니다. 관리자 또는 공연 관리자 권한이 필요합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "등록 성공"),
             @ApiResponse(responseCode = "401", description = "인증 실패"),
@@ -139,34 +139,23 @@ public class PerformanceController {
     })
     @PostMapping
     public ResponseEntity<PerformanceDto> createPerformance(
-            @Parameter(description = "JWT 토큰", required = true)
-            @RequestHeader("Authorization") String authHeader,
-            @Parameter(description = "공연명", required = true)
-            @RequestParam("prfnm") String prfnm,
-            @Parameter(description = "장르명", required = true)
-            @RequestParam("genreName") String genreName,
-            @Parameter(description = "공연 시작일 (yyyy-MM-dd)", required = true)
-            @RequestParam("prfpdfrom") String prfpdfrom,
-            @Parameter(description = "공연 종료일 (yyyy-MM-dd)", required = true)
-            @RequestParam("prfpdto") String prfpdto,
-            @Parameter(description = "공연 시설명", required = true)
-            @RequestParam("fcltynm") String fcltynm,
-            @Parameter(description = "지역", required = true)
-            @RequestParam("area") String area,
-            @Parameter(description = "공연장 ID", required = true)
-            @RequestParam("mt10id") String mt10id,
-            @Parameter(description = "공연 상태 (공연예정/공연중/공연완료)", required = true)
-            @RequestParam("prfstate") String prfstate,
-            @Parameter(description = "포스터 이미지 파일", required = true)
-            @RequestPart("poster") org.springframework.web.multipart.MultipartFile poster) {
+            @Parameter(description = "JWT 토큰", required = true) @RequestHeader("Authorization") String authHeader,
+            @Parameter(description = "공연명", required = true) @RequestParam("prfnm") String prfnm,
+            @Parameter(description = "장르명", required = true) @RequestParam("genreName") String genreName,
+            @Parameter(description = "공연 시작일 (yyyy-MM-dd)", required = true) @RequestParam("prfpdfrom") String prfpdfrom,
+            @Parameter(description = "공연 종료일 (yyyy-MM-dd)", required = true) @RequestParam("prfpdto") String prfpdto,
+            @Parameter(description = "공연 시설명", required = true) @RequestParam("fcltynm") String fcltynm,
+            @Parameter(description = "지역", required = true) @RequestParam("area") String area,
+            @Parameter(description = "공연장 ID", required = true) @RequestParam("mt10id") String mt10id,
+            @Parameter(description = "공연 상태 (공연예정/공연중/공연완료)", required = true) @RequestParam("prfstate") String prfstate,
+            @Parameter(description = "포스터 이미지 파일", required = true) @RequestPart("poster") org.springframework.web.multipart.MultipartFile poster) {
         String token = authHeader.replace("Bearer ", "");
         String email = jwtUtil.extractUsername(token);
         return ResponseEntity.ok(performanceService.createPerformance(
                 email, prfnm, genreName, prfpdfrom, prfpdto, fcltynm, area, mt10id, prfstate, poster));
     }
 
-    @Operation(summary = "공연 수정",
-               description = "기존 공연 정보를 수정합니다. 관리자 또는 공연 등록자만 수정 가능합니다.")
+    @Operation(summary = "공연 수정", description = "기존 공연 정보를 수정합니다. 관리자 또는 공연 등록자만 수정 가능합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "401", description = "인증 실패"),
@@ -175,10 +164,8 @@ public class PerformanceController {
     })
     @PutMapping("/{id}")
     public ResponseEntity<PerformanceDto> updatePerformance(
-            @Parameter(description = "JWT 토큰", required = true)
-            @RequestHeader("Authorization") String authHeader,
-            @Parameter(description = "공연 ID", required = true)
-            @PathVariable String id,
+            @Parameter(description = "JWT 토큰", required = true) @RequestHeader("Authorization") String authHeader,
+            @Parameter(description = "공연 ID", required = true) @PathVariable String id,
             @RequestParam("prfnm") String prfnm,
             @RequestParam("genreName") String genreName,
             @RequestParam("prfpdfrom") String prfpdfrom,
@@ -187,16 +174,14 @@ public class PerformanceController {
             @RequestParam("area") String area,
             @RequestParam("mt10id") String mt10id,
             @RequestParam("prfstate") String prfstate,
-            @Parameter(description = "포스터 이미지 파일 (선택사항)")
-            @RequestPart(value = "poster", required = false) org.springframework.web.multipart.MultipartFile poster) {
+            @Parameter(description = "포스터 이미지 파일 (선택사항)") @RequestPart(value = "poster", required = false) org.springframework.web.multipart.MultipartFile poster) {
         String token = authHeader.replace("Bearer ", "");
         String email = jwtUtil.extractUsername(token);
         return ResponseEntity.ok(performanceService.updatePerformance(
                 email, id, prfnm, genreName, prfpdfrom, prfpdto, fcltynm, area, mt10id, prfstate, poster));
     }
 
-    @Operation(summary = "공연 삭제",
-               description = "공연을 삭제합니다. 관리자 또는 공연 등록자만 삭제 가능합니다.")
+    @Operation(summary = "공연 삭제", description = "공연을 삭제합니다. 관리자 또는 공연 등록자만 삭제 가능합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "삭제 성공"),
             @ApiResponse(responseCode = "401", description = "인증 실패"),
@@ -205,26 +190,22 @@ public class PerformanceController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePerformance(
-            @Parameter(description = "JWT 토큰", required = true)
-            @RequestHeader("Authorization") String authHeader,
-            @Parameter(description = "공연 ID", required = true)
-            @PathVariable String id) {
+            @Parameter(description = "JWT 토큰", required = true) @RequestHeader("Authorization") String authHeader,
+            @Parameter(description = "공연 ID", required = true) @PathVariable String id) {
         String token = authHeader.replace("Bearer ", "");
         String email = jwtUtil.extractUsername(token);
         performanceService.deletePerformance(email, id);
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "공연 포스터 이미지 조회",
-               description = "공연 ID로 포스터 이미지를 조회합니다.")
+    @Operation(summary = "공연 포스터 이미지 조회", description = "공연 ID로 포스터 이미지를 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "404", description = "포스터를 찾을 수 없음")
     })
     @GetMapping("/poster/{id}")
     public ResponseEntity<byte[]> getPoster(
-            @Parameter(description = "공연 ID", required = true)
-            @PathVariable String id) {
+            @Parameter(description = "공연 ID", required = true) @PathVariable String id) {
         System.out.println("🎯 Controller - getPoster 호출됨! ID: " + id);
         return performanceService.getPoster(id);
     }
